@@ -47,6 +47,13 @@ interface NavCollapseProps {
   parentId?: string;
 }
 
+interface NavItemProps {
+  item: MenuItem;
+  level: number;
+  isParents?: boolean;
+  setSelectedID?: (id: string | null) => void;
+}
+
 export const NavCollapse: React.FC<NavCollapseProps> = ({ menu, level, parentId }) => {
   const theme = useTheme();
   const ref = useRef<HTMLSpanElement>(null);
@@ -142,7 +149,7 @@ export const NavCollapse: React.FC<NavCollapseProps> = ({ menu, level, parentId 
       case 'collapse':
         return <NavCollapse key={item.id} menu={item} level={level + 1} parentId={parentId} />;
       case 'item':
-        return <NavItem key={item.id} item={item} level={level + 1} setSelectedID={setSelected} />;
+        return <NavItem key={item.id} item={item} level={level + 1} setSelectedID={(id) => setSelected(id)} />;
       default:
         return (
           <Typography key={item.id} variant="h6" color="error" align="center">

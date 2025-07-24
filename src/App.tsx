@@ -12,14 +12,15 @@ import ThemeCustomization from 'themes';
 
 // ==============================|| APP ||============================== //
 
-export default function App() {
+
+const App: React.FC = () => {
   return (
     <ThemeCustomization>
       <NavigationScroll>
-        <>
-          <RouterProvider router={router} />
-        </>
+        <RouterProvider router={router} />
       </NavigationScroll>
     </ThemeCustomization>
   );
-}
+};
+
+export default App;

@@ -1,5 +1,4 @@
-import PropTypes from 'prop-types';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, matchPath, useLocation } from 'react-router-dom';
 
 // material-ui
@@ -21,33 +20,62 @@ import useConfig from 'hooks/useConfig';
 // assets
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 
-export default function NavItem({ item, level, isParents = false, setSelectedID }) {
+
+// Type definitions
+interface MenuItem {
+  id: string;
+  type: string;
+  title: string;
+  caption?: string;
+  url?: string;
+  link?: string;
+  icon?: React.ElementType;
+  chip?: {
+    color: string;
+    variant: string;
+    size: string;
+    label: string;
+    avatar?: string;
+  };
+  target?: boolean;
+  disabled?: boolean;
+  children?: MenuItem[];
+}
+
+interface NavItemProps {
+  item: MenuItem;
+  level: number;
+  isParents?: boolean;
+  setSelectedID?: () => void;
+}
+
+const NavItem: React.FC<NavItemProps> = ({ item, level, isParents = false, setSelectedID }) => {
   const theme = useTheme();
   const downMD = useMediaQuery(theme.breakpoints.down('md'));
-  const ref = useRef(null);
-
+  const ref = useRef<HTMLSpanElement>(null);
   const { pathname } = useLocation();
   const { borderRadius } = useConfig();
-
   const { menuMaster } = useGetMenuMaster();
-  const drawerOpen = menuMaster.isDashboardDrawerOpened;
-  const isSelected = !!matchPath({ path: item?.link ? item.link : item.url, end: false }, pathname);
-
+  const drawerOpen = menuMaster?.isDashboardDrawerOpened ?? false;
+  const itemPath = item?.link ?? item.url ?? '';
+  const isSelected = !!(itemPath && matchPath({ path: itemPath, end: false }, pathname));
   const [hoverStatus, setHover] = useState(false);
 
   const compareSize = () => {
-    const compare = ref.current && ref.current.scrollWidth > ref.current.clientWidth;
+    const compare = !!(ref.current && ref.current.scrollWidth > ref.current.clientWidth);
     setHover(compare);
   };
 
   useEffect(() => {
     compareSize();
     window.addEventListener('resize', compareSize);
-    window.removeEventListener('resize', compareSize);
+    return () => {
+      window.removeEventListener('resize', compareSize);
+    };
   }, []);
 
   const Icon = item?.icon;
-  const itemIcon = item?.icon ? (
+  const itemIcon = Icon ? (
     <Icon stroke={1.5} size={drawerOpen ? '20px' : '24px'} style={{ ...(isParents && { fontSize: 20, stroke: '1.5' }) }} />
   ) : (
     <FiberManualRecordIcon sx={{ width: isSelected ? 8 : 6, height: isSelected ? 8 : 6 }} fontSize={level > 0 ? 'inherit' : 'medium'} />
@@ -60,7 +88,6 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
 
   const itemHandler = () => {
     if (downMD) handlerDrawerOpen(false);
-
     if (isParents && setSelectedID) {
       setSelectedID();
     }
@@ -72,7 +99,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
     <>
       <ListItemButton
         component={Link}
-        to={item.url}
+        to={item.url ?? ''}
         target={itemTarget}
         disabled={item.disabled}
         disableRipple={!drawerOpen}
@@ -160,7 +187,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
               }
               secondary={
                 item.caption && (
-                  <Typography variant="caption" gutterBottom sx={{ display: 'block', ...theme.typography.subMenuCaption }}>
+                  <Typography variant="caption" gutterBottom className="block text-xs text-gray-500 dark:text-gray-400">
                     {item.caption}
                   </Typography>
                 )
@@ -171,16 +198,22 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
 
         {drawerOpen && item.chip && (
           <Chip
-            color={item.chip.color}
-            variant={item.chip.variant}
-            size={item.chip.size}
+            color={item.chip.color as any}
+            variant={item.chip.variant as any}
+            size={item.chip.size as any}
             label={item.chip.label}
-            avatar={item.chip.avatar && <Avatar>{item.chip.avatar}</Avatar>}
+            avatar={
+              item.chip.avatar
+                ? typeof item.chip.avatar === 'string'
+                  ? <Avatar>{item.chip.avatar}</Avatar>
+                  : item.chip.avatar
+                : undefined
+            }
           />
         )}
       </ListItemButton>
     </>
   );
-}
+};
 
-NavItem.propTypes = { item: PropTypes.any, level: PropTypes.number, isParents: PropTypes.bool, setSelectedID: PropTypes.func };
+export default NavItem;

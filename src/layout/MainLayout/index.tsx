@@ -26,13 +26,13 @@ export default function MainLayout() {
   const theme = useTheme();
   const downMD = useMediaQuery(theme.breakpoints.down('md'));
 
-  const { borderRadius, miniDrawer } = useConfig();
+  const { borderRadius } = useConfig();
   const { menuMaster, menuMasterLoading } = useGetMenuMaster();
   const drawerOpen = menuMaster?.isDashboardDrawerOpened;
 
   useEffect(() => {
-    handlerDrawerOpen(!miniDrawer);
-  }, [miniDrawer]);
+    handlerDrawerOpen(!drawerOpen);
+  }, [drawerOpen]);
 
   useEffect(() => {
     downMD && handlerDrawerOpen(false);
@@ -58,7 +58,15 @@ export default function MainLayout() {
       <MainContentStyled {...{ borderRadius, open: drawerOpen }}>
         <Box sx={{ ...{ px: { xs: 0 } }, minHeight: 'calc(100vh - 128px)', display: 'flex', flexDirection: 'column' }}>
           {/* breadcrumb */}
-          <Breadcrumbs />
+          <Breadcrumbs
+            card={false}
+            heading="Dashboard"
+            icons={[]}
+            links={[]}
+            maxItems={3}
+            titleBottom={false}
+            sx={{}}
+          />
           <Outlet />
           <Footer />
         </Box>
