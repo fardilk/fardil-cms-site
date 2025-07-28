@@ -1,6 +1,7 @@
 import DashboardLayout from '@/components/layout/GlobalLayout';
 import { useState } from 'react';
 import { useArticle } from '../hooks/useArticle';
+import { useNavigate } from 'react-router-dom';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -15,6 +16,7 @@ const truncate = (str: string, n: number) =>
 const ArticlePage = () => {
   const [page, setPage] = useState(1);
   const perPage = 8;
+  const navigate = useNavigate();
 
   const { articles, loading, error } = useArticle();
 
@@ -77,6 +79,13 @@ const ArticlePage = () => {
                     ))}
                   </div>
                 )}
+                {/* See Details Button */}
+                <button
+                  className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+                  onClick={() => navigate(`/artikel/${article.id}`)}
+                >
+                  Lihat
+                </button>
               </div>
             </div>
           ))}
