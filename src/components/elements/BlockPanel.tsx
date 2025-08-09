@@ -27,10 +27,26 @@ const BlockPanel: React.FC = () => (
   <div className="bg-white rounded-xl shadow p-6">
     <h2 className="text-lg font-bold mb-4">Elements Panel</h2>
     <div className="flex flex-col gap-4">
-      <ElementItem type="heading1" icon={<span className="text-2xl font-bold">H1</span>} label="Heading 1" />
-      <ElementItem type="paragraph" icon={<span className="text-base">¶</span>} label="Paragraph" />
-      <ElementItem type="image" icon={<span className="text-2xl">🖼️</span>} label="Image" />
-      <ElementItem type="divider" icon={<span className="w-8 h-1 bg-gray-400 rounded block mx-auto"></span>} label="Divider" />
+      <ElementItem
+      type="heading1"
+      icon={<i className="fas fa-heading text-blue-400 text-2xl"></i>}
+      label="Heading 1"
+      />
+      <ElementItem
+      type="paragraph"
+      icon={<i className="fas fa-paragraph text-blue-300 text-base"></i>}
+      label="Paragraph"
+      />
+      <ElementItem
+      type="image"
+      icon={<i className="fas fa-image text-blue-400 text-2xl"></i>}
+      label="Image"
+      />
+      <ElementItem
+      type="divider"
+      icon={<i className="fas fa-minus w-8 text-blue-200 text-xl"></i>}
+      label="Divider"
+      />
     </div>
     <div className="mt-4 text-xs text-gray-500">
       Drag an element to the editor to add it to your article.

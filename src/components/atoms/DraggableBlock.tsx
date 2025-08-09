@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 
 export const BLOCK_TYPE = 'BLOCK';
@@ -6,25 +6,18 @@ export const BLOCK_TYPE = 'BLOCK';
 export function DraggableBlock({
   id,
   index,
-  moveBlock,
   children,
 }: {
   id: string;
   index: number;
-  moveBlock: (from: number, to: number) => void;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  const [, drop] = useDrop({
+  const [{ isOver }, drop] = useDrop({
     accept: BLOCK_TYPE,
-    hover(item: { index: number }, monitor) {
-      if (!ref.current) return;
-      const dragIndex = item.index;
-      const hoverIndex = index;
-      if (dragIndex === hoverIndex) return;
-      moveBlock(dragIndex, hoverIndex);
-      item.index = hoverIndex;
+    hover() {
+      // Only show outline, no movement
     },
     collect: monitor => ({
       isOver: monitor.isOver(),
@@ -46,8 +39,9 @@ export function DraggableBlock({
       ref={ref}
       style={{
         opacity: isDragging ? 0.5 : 1,
-        border: isDragging ? '2px dashed #3b82f6' : 'none',
+        border: isOver ? '2px solid #3b82f6' : isDragging ? '2px dashed #3b82f6' : 'none',
         position: 'relative',
+        transition: 'border 0.2s',
       }}
       className="mb-2"
     >
