@@ -7,6 +7,7 @@ import Category from '../../pages/Category';
 import ArticlePage from '../../pages/ArticlePage';
 import ArticlePageDetail from '../../pages/ArticlePageDetail';
 import ProtectedRoute from '../func/ProtectedRoute';
+import Preview from '@/pages/Preview';
 
 const AppRouter = () => (
   <DndProvider backend={HTML5Backend}>
@@ -41,6 +42,14 @@ const AppRouter = () => (
         element={
           <ProtectedRoute>
             <ArticlePageDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/preview/:id"
+        element={
+          <ProtectedRoute>
+            <Preview />
           </ProtectedRoute>
         }
       />
