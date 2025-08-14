@@ -7,7 +7,6 @@ import { ToggleHeadingBlock, Blockquote, PullQuote, CodeBlock, ImageUploader, Vi
 import BlockPanel from '@/components/elements/BlockPanel';
 import { useContentBlocks } from '@/components/func/contentBlocks';
 import type { ContentBlock } from '@/components/func/contentBlocks';
-import type { TextAlign, TextTransform } from '@/components/func/contentBlocks';
 import Seo from '@/elements/Seo';
 import { DraggableBlock, BLOCK_TYPE } from '@/components/atoms/DraggableBlock';
 import { useDrop, useDragLayer } from 'react-dnd';
@@ -99,13 +98,14 @@ const ArticlePageDetail = () => {
     setArticle(prev => prev ? { ...prev, featuredImage: src } : prev);
   };
 
+  // Create block without filler, use labels as placeholders only
   const createBlock = (type: string, meta?: DragMeta): ContentBlock | null => {
     const uid = Date.now().toString() + Math.random().toString(36).slice(2);
     switch (type) {
       case 'heading':
-        return { id: uid, type: 'heading', data: { content: 'Heading', level: meta?.level ?? 1 } };
+        return { id: uid, type: 'heading', data: { content: '', level: meta?.level ?? 1 } };
       case 'paragraph':
-        return { id: uid, type: 'paragraph', data: { content: 'Write something...' } };
+        return { id: uid, type: 'paragraph', data: { content: '' } }; // keep content left-aligned by default
       case 'blockquote':
         return { id: uid, type: 'blockquote', data: { content: 'Quote goes here' } };
       case 'pullquote':
@@ -192,38 +192,13 @@ const ArticlePageDetail = () => {
     updateBlockAt(idx, { spans, content: undefined });
   };
 
-  const PARAGRAPH_PRESET = 'PARA_PRESET';
-
-  // utility to apply paragraph preset
-  const applyParagraphPreset = (idx: number, preset: Partial<ContentBlock['data']>) => {
-    const allowedAlign = new Set<TextAlign>(['left','center','right','justify']);
-    const allowedTransform = new Set<TextTransform>(['none','uppercase','lowercase','capitalize']);
-    const patch: Partial<ContentBlock['data']> = {};
-    if (preset.align && allowedAlign.has(preset.align)) patch.align = preset.align;
-    if (preset.transform && allowedTransform.has(preset.transform)) patch.transform = preset.transform;
-    if (Object.keys(patch).length) updateBlockAt(idx, patch);
+  const moveUp = (i: number) => {
+    if (i <= 0) return;
+    moveBlock(i, i - 1);
   };
-
-  // Left gutter drop target per paragraph
-  const ParagraphPresetDrop: React.FC<{ index: number }> = ({ index }) => {
-    const [{ isOver }, drop] = useDrop<{ preset?: Partial<ContentBlock['data']> }, { handled: true } | undefined, { isOver: boolean}>({
-      accept: PARAGRAPH_PRESET,
-      drop: (item) => {
-        if (!item?.preset) return undefined;
-        applyParagraphPreset(index, item.preset);
-        return { handled: true };
-      },
-      collect: (m) => ({ isOver: m.isOver({ shallow: true }) }),
-    });
-    return drop(
-      <div
-        className="absolute -left-10 top-1/2 -translate-y-1/2 w-8 h-8 rounded border flex items-center justify-center text-xs bg-white"
-        style={{ borderColor: isOver ? '#3b82f6' : '#e5e7eb', color: 'var(--text-primary)' }}
-        title="Drop paragraph preset here"
-      >
-        ⊕
-      </div>
-    );
+  const moveDown = (i: number) => {
+    if (i >= contentBlocks.length - 1) return;
+    moveBlock(i, i + 1);
   };
 
   return (
@@ -278,8 +253,21 @@ const ArticlePageDetail = () => {
             {contentBlocks.map((block, idx) => (
               <DraggableBlock key={block.id} id={block.id} index={idx} moveBlock={moveBlock}>
                 <div className="group relative">
-                  {/* Left-side preset drop only for paragraph */}
-                  {block.type === 'paragraph' && <ParagraphPresetDrop index={idx} />}
+                  {/* Move controls on the right, show on hover */}
+                  <div className="absolute -right-10 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      className={`w-7 h-7 rounded border bg-white text-xs ${idx<=0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      onClick={()=>moveUp(idx)}
+                      disabled={idx<=0}
+                      title="Move up"
+                    >↑</button>
+                    <button
+                      className={`w-7 h-7 rounded border bg-white text-xs ${idx>=contentBlocks.length-1 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      onClick={()=>moveDown(idx)}
+                      disabled={idx>=contentBlocks.length-1}
+                      title="Move down"
+                    >↓</button>
+                  </div>
 
                   <button
                     onClick={()=>toggleOptions(block.id)}
@@ -295,7 +283,7 @@ const ArticlePageDetail = () => {
                       case 'heading':
                         return (
                           <>
-                            {/* Compact heading toolbar above: levels and alignment icons */}
+                            {/* Compact heading toolbar above remains */}
                             {optionsOpen[block.id] && (
                               <div className="mb-2 p-2 border rounded bg-gray-50 text-xs flex items-center justify-between">
                                 <div className="flex items-center gap-1">
@@ -320,24 +308,29 @@ const ArticlePageDetail = () => {
                               </div>
                             )}
 
-                            <ToggleHeadingBlock
-                              content={block.data.content ?? ''}
-                              level={block.data.level ?? 1}
-                              align={(block.data.align as 'left'|'center'|'right') || 'left'}
-                              onChange={(val)=> updateBlockAt(idx, { content: val })}
-                            />
+                            <div>
+                              <ToggleHeadingBlock
+                                content={block.data.content ?? ''}
+                                level={block.data.level ?? 1}
+                                align={(block.data.align as 'left'|'center'|'right') || 'left'}
+                                onChange={(val)=> updateBlockAt(idx, { content: val })}
+                              />
+                            </div>
                           </>
                         );
                       case 'paragraph':
                         return (
-                          <>
-                            {/* Left gutter preset drop target placeholder (future enhancement) */}
+                          <div>
                             <ParagraphRich
                               spans={block.data.spans || [{ text: block.data.content || '' }]}
                               align={block.data.align || 'left'}
                               transform={block.data.transform || 'none'}
                               onChange={(spans)=> setParagraphSpans(idx, spans)}
                             />
+                            {/* Placeholder when empty */}
+                            {(!block.data.spans && !block.data.content) && (
+                              <span className="pointer-events-none absolute left-4 top-2 text-gray-400 opacity-40">Paragraph</span>
+                            )}
                             {optionsOpen[block.id] && (
                               <div className="mt-2 p-3 border rounded bg-gray-50 text-xs">
                                 <div className="font-semibold mb-2">Paragraph Options</div>
@@ -369,7 +362,7 @@ const ArticlePageDetail = () => {
                                 </div>
                               </div>
                             )}
-                          </>
+                          </div>
                         );
                       case 'blockquote':
                         return (

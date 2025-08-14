@@ -11,37 +11,6 @@ const BlockPanel: React.FC = () => {
         <AccordionSection title="Headings & Paragraphs" open={open.hp} onToggle={()=>setOpen(o=>({...o,hp:!o.hp}))}>
           <ElementItem type={`heading`} icon={<i className="fas fa-heading text-blue-400 text-xl"/>} label="Heading" />
           <ElementItem type="paragraph" icon={<i className="fas fa-paragraph text-blue-300 text-base"></i>} label="Paragraph" />
-          {/* Paragraph presets (drag to left gutter of a paragraph) */}
-          <div className="grid grid-cols-2 gap-2">
-            <ElementItem
-              type="paragraph"
-              label="Align Left"
-              icon={<span className="text-xs">⟸</span>}
-              dragType="PARA_PRESET"
-              payload={{ type: 'PARA_PRESET', preset: { align: 'left' } }}
-            />
-            <ElementItem
-              type="paragraph"
-              label="Align Center"
-              icon={<span className="text-xs">↔</span>}
-              dragType="PARA_PRESET"
-              payload={{ type: 'PARA_PRESET', preset: { align: 'center' } }}
-            />
-            <ElementItem
-              type="paragraph"
-              label="Uppercase"
-              icon={<span className="text-[10px] font-semibold">AA</span>}
-              dragType="PARA_PRESET"
-              payload={{ type: 'PARA_PRESET', preset: { transform: 'uppercase' } }}
-            />
-            <ElementItem
-              type="paragraph"
-              label="Lowercase"
-              icon={<span className="text-[10px]">aa</span>}
-              dragType="PARA_PRESET"
-              payload={{ type: 'PARA_PRESET', preset: { transform: 'lowercase' } }}
-            />
-          </div>
         </AccordionSection>
 
         <AccordionSection title="Visual" open={open.visual} onToggle={()=>setOpen(o=>({...o,visual:!o.visual}))}>

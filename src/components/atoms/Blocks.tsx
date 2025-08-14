@@ -17,6 +17,18 @@ export const ToggleHeadingBlock = ({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
   const lvl = Math.min(6, Math.max(1, level ?? 1));
+  const headingRef = useRef<HTMLElement | null>(null);
+
+  const placeCaretAtEnd = () => {
+    const el = headingRef.current;
+    if (!el) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
 
   const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
     const text = e.currentTarget.textContent || '';
@@ -26,6 +38,8 @@ export const ToggleHeadingBlock = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    // Keep caret at end so typing appends on the right
+    placeCaretAtEnd();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const text = (e.currentTarget as HTMLElement).textContent || '';
@@ -52,18 +66,20 @@ export const ToggleHeadingBlock = ({
       {React.createElement(
         Tag,
         {
-          className: `rounded-lg px-4 py-2 font-bold ${sizeClass} transition-colors hover:border hover:border-blue-50`,
+          ref: (el: HTMLElement | null) => { headingRef.current = el; },
+          className: `rounded-lg px-4 py-2 font-bold ${sizeClass}`,
           contentEditable: editing,
           suppressContentEditableWarning: true,
           onBlur: handleBlur,
           onKeyDown: handleKeyDown,
+          onFocus: () => placeCaretAtEnd(),
           tabIndex: 0,
-          onClick: () => setEditing(true),
-          style: { userSelect: editing ? 'text' : 'none', cursor: editing ? 'text' : 'grab', textAlign: align, color: 'var(--text-primary)' },
+          onClick: () => { setEditing(true); placeCaretAtEnd(); },
+          style: { userSelect: 'text', cursor: 'text', textAlign: align, color: 'var(--text-primary)' },
         },
         value
       )}
-      {(!value || value.length === 0) && (
+      {(!value || value.length === 0) && !editing && (
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 opacity-40 select-none" style={{ color: 'var(--text-primary)' }}>
           Heading
         </span>
@@ -96,10 +112,9 @@ export const ParagraphBlock = ({
       setValue(text);
       setEditing(false);
       onChange?.(text);
-      e.currentTarget.blur();
+      (e.currentTarget as HTMLDivElement).blur();
     }
   };
-
   return (
     <div
       className={`bg-gray-50 rounded-lg px-4 py-3 my-2 text-base transition-colors hover:border hover:border-blue-50 ${editing ? 'cursor-text' : 'cursor-grab'}`}
@@ -109,7 +124,7 @@ export const ParagraphBlock = ({
       onKeyDown={handleKeyDown}
       tabIndex={0}
       onClick={() => setEditing(true)}
-      style={{ userSelect: editing ? 'text' : 'none' }}
+      style={{ userSelect: 'text', cursor: 'text', color: 'var(--text-primary)' }}
     >
       {value}
     </div>
@@ -119,7 +134,7 @@ export const ParagraphBlock = ({
 export const Blockquote = ({ content, onChange }: { content: string; onChange?: (v:string)=>void }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
-  const handleBlur = (e: React.FocusEvent<HTMLQuoteElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
     const text = e.currentTarget.textContent || '';
     setValue(text);
     setEditing(false);
@@ -395,6 +410,18 @@ export const ParagraphRich: React.FC<ParagraphRichProps> = ({ spans, align='left
   const [local, setLocal] = useState(spans.length ? spans : [{ text: '' }]);
   const [linkIndex, setLinkIndex] = useState<number|null>(null);
   const [linkValue, setLinkValue] = useState('');
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  const placeCaretAtEnd = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
 
   const toggleMark = (mark: SpanMark) => {
     // naive: toggle on the last span
@@ -432,11 +459,14 @@ export const ParagraphRich: React.FC<ParagraphRichProps> = ({ spans, align='left
     const updated = [{ text, marks: lastMarks, href: lastHref }];
     setLocal(updated);
     onChange?.(updated);
+  requestAnimationFrame(() => placeCaretAtEnd());
   };
 
   const style: React.CSSProperties = {
     textAlign: align,
     textTransform: transform === 'uppercase' || transform === 'lowercase' || transform === 'capitalize' ? transform : 'none',
+    cursor: 'text',
+    color: 'var(--text-primary)'
   };
 
   const renderHTML = () => {
@@ -469,10 +499,13 @@ export const ParagraphRich: React.FC<ParagraphRichProps> = ({ spans, align='left
         )}
       </div>
       <div
-        className={`bg-gray-50 rounded-lg px-4 py-3 text-base transition-colors hover:border hover:border-blue-50`}
+        ref={editorRef}
+        className={`bg-gray-50 rounded-lg px-4 py-3 text-base`}
         contentEditable
         suppressContentEditableWarning
         onInput={onInput}
+    onFocus={placeCaretAtEnd}
+    onClick={placeCaretAtEnd}
         style={style}
       >
         {renderHTML()}
