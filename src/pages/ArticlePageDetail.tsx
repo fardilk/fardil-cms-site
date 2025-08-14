@@ -5,9 +5,11 @@ import { useEffect, useState, useRef } from 'react';
 import { Article } from '@/hooks/useArticle';
 import { ToggleHeadingBlock, Blockquote, PullQuote, CodeBlock, ImageUploader, VideoBlock, TableBlock, DividerBlock, ParagraphRich } from '@/components/atoms/Blocks';
 import BlockPanel from '@/components/elements/BlockPanel';
+import HoverToolbar from '@/components/atoms/HoverToolbar';
 import { useContentBlocks } from '@/components/func/contentBlocks';
 import type { ContentBlock } from '@/components/func/contentBlocks';
 import Seo from '@/elements/Seo';
+import { imageURL, apiFetch } from '@/lib/api';
 import { DraggableBlock, BLOCK_TYPE } from '@/components/atoms/DraggableBlock';
 import { useDrop, useDragLayer } from 'react-dnd';
 
@@ -19,9 +21,12 @@ const ArticlePageDetail = () => {
   const { id } = useParams();
   const [article, setArticle] = useState<Article | null>(null);
   const { contentBlocks, setContentBlocks } = useContentBlocks();
-  const [optionsOpen, setOptionsOpen] = useState<Record<string, boolean>>({});
   const [slug, setSlug] = useState('');
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState<string>('');
+  const [featuredBlobURL, setFeaturedBlobURL] = useState<string | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
 
   const slugify = (s: string) => s
     .toLowerCase()
@@ -37,6 +42,15 @@ const ArticlePageDetail = () => {
     setContentBlocks(updated);
   };
 
+  // Insert a new block after an index
+  const insertBlockAfter = (index: number, newBlock: ContentBlock) => {
+    setContentBlocks((prev) => {
+      const next = [...prev];
+      next.splice(index + 1, 0, newBlock);
+      return next;
+    });
+  };
+
   const updateBlockAt = (idx: number, patch: Partial<ContentBlock['data']>) => {
     setContentBlocks(prev => {
       const next = [...prev];
@@ -48,9 +62,13 @@ const ArticlePageDetail = () => {
   };
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/articles/${id}`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
+    setError('');
+    apiFetch(`/api/articles/${id}`, { credentials: 'include' })
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch article ${id}`);
+        return res.json();
+      })
+      .then((data) => {
         type ApiArticle = {
           ID?: string; id?: string;
           Title?: string; title?: string;
@@ -58,11 +76,19 @@ const ArticlePageDetail = () => {
           Category?: string; category?: string;
           Excerpt?: string; excerpt?: string;
           MetaDescription?: string; meta_description?: string;
+          Description?: string; description?: string; Body?: string; body?: string; Content?: string; content?: string;
           Tags?: string[]; tags?: string[];
           FeaturedImage?: string; featured_image?: string;
           [key: string]: unknown;
         };
-        const a: ApiArticle = data || {};
+        // Normalize common API wrappers: { data: {...} } | { article: {...} } | { result: {...} } | {...}
+        const container = (val: unknown) => (val && typeof val === 'object' ? (val as Record<string, unknown>) : {});
+        const obj = container(data);
+        const wrapped = (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) ? obj.data
+          : (obj.article && typeof obj.article === 'object') ? obj.article
+          : (obj.result && typeof obj.result === 'object') ? obj.result
+          : obj;
+        const a: ApiArticle = (wrapped as ApiArticle) || {};
         const rawTags = (a.Tags ?? a.tags) as unknown;
         const tags: string[] = Array.isArray(rawTags)
           ? rawTags
@@ -83,6 +109,7 @@ const ArticlePageDetail = () => {
           category: a.Category ?? a.category,
           excerpt: a.Excerpt ?? a.excerpt,
           meta_description: a.MetaDescription ?? a.meta_description,
+          description: a.Description ?? a.description ?? a.Body ?? a.body ?? a.Content ?? a.content,
           tags,
           featuredImage: a.FeaturedImage ?? a.featured_image,
         };
@@ -91,12 +118,54 @@ const ArticlePageDetail = () => {
           setTitle(mapped.title);
           setSlug(slugify(mapped.title));
         }
+        if (mapped.description) setDescription(mapped.description);
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : 'Unknown error fetching article';
+        setError(msg);
       });
   }, [id]);
 
   const setFeaturedImage = (src?: string) => {
+    // Clear any previous blob URL when changing/removing
+    if (featuredBlobURL) {
+      URL.revokeObjectURL(featuredBlobURL);
+      setFeaturedBlobURL(undefined);
+    }
     setArticle(prev => prev ? { ...prev, featuredImage: src } : prev);
   };
+
+  // Prefetch featured image with credentials to avoid ORB and auth redirects
+  useEffect(() => {
+    const src = article?.featuredImage;
+    if (!src) return;
+    // Compute API path for fetching as blob
+    const path = /^https?:\/\//i.test(src)
+      ? undefined // can't fetch cross-origin without CORS; rely on direct URL
+      : (src.startsWith('/') ? src : `/images/${src}`);
+    let cancelled = false;
+    if (!path) return;
+    apiFetch(path, { credentials: 'include', headers: { Accept: 'image/*' } })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load image');
+        const ctype = res.headers.get('content-type') || '';
+        if (!ctype.startsWith('image/')) throw new Error('Not an image');
+        const blob = await res.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        setFeaturedBlobURL((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      })
+      .catch(() => {
+        // Fallback: let <img> use direct URL; may fail if server blocks
+        setFeaturedBlobURL(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [article?.featuredImage]);
 
   // Create block without filler, use labels as placeholders only
   const createBlock = (type: string, meta?: DragMeta): ContentBlock | null => {
@@ -184,9 +253,9 @@ const ArticlePageDetail = () => {
   const editorRef = useRef<HTMLDivElement | null>(null);
   editorDrop(editorRef);
 
-  if (!article) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+  if (!article) return <DashboardLayout><div>{error ? <span className="text-red-500">{error}</span> : 'Loading...'}</div></DashboardLayout>;
 
-  const toggleOptions = (id: string) => setOptionsOpen(prev => ({ ...prev, [id]: !prev[id] }));
+  // Options popover removed; toolbars appear on hover only.
 
   const setParagraphSpans = (idx: number, spans: { text: string; marks?: Array<'bold'|'italic'|'underline'|'strike'|'link'>; href?: string }[]) => {
     updateBlockAt(idx, { spans, content: undefined });
@@ -247,6 +316,60 @@ const ArticlePageDetail = () => {
                   style={{ color: 'var(--text-primary)' }}
                 />
               </div>
+              <div className="mt-4">
+                <label className="block text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Description</label>
+                <textarea
+                  className="w-full border rounded p-3 text-sm"
+                  rows={6}
+                  value={description}
+                  onChange={(e)=>setDescription(e.target.value)}
+                  placeholder="Write the article description..."
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    className="px-3 py-1 rounded border bg-blue-600 text-white"
+                    onClick={async ()=>{
+                      if (!id) return;
+                      // PUT update to backend
+                      try {
+                        setSaving(true);
+                        const payload = { description };
+                        let res = await apiFetch(`/api/articles/${id}`, {
+                          method: 'PUT',
+                          credentials: 'include',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(payload),
+                        });
+                        if (!res.ok && (res.status === 405 || res.status === 404)) {
+                          // Fallback for APIs that use POST to update
+                          res = await apiFetch(`/api/articles/${id}`, {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                          });
+                        }
+                        if (!res.ok) throw new Error('Failed to update article');
+                        // Update local copy
+                        setArticle(prev => prev ? { ...prev, description } : prev);
+                        const t = await import('react-hot-toast');
+                        t.toast.success('Description saved');
+                      } catch (e) {
+                        console.error(e);
+                        const t = await import('react-hot-toast');
+                        t.toast.error('Failed to save');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                  >{saving ? 'Saving…' : 'Save'}</button>
+                  <button
+                    className="px-3 py-1 rounded border bg-gray-100"
+                    onClick={()=> setDescription(article?.description || '')}
+                  >Reset</button>
+                </div>
+              </div>
             </div>
 
             {/* Rule B: render existing blocks; reordering handled inside DraggableBlock */}
@@ -269,13 +392,7 @@ const ArticlePageDetail = () => {
                     >↓</button>
                   </div>
 
-                  <button
-                    onClick={()=>toggleOptions(block.id)}
-                    className="hidden group-hover:block absolute -right-2 -top-2 z-10 bg-white border rounded px-2 py-1 text-xs shadow"
-                    title="Options"
-                  >
-                    <i className="fas fa-sliders-h"></i>
-                  </button>
+                  {/* Legacy options button removed */}
 
                   {/* Block renderer */}
                   {(() => {
@@ -283,36 +400,44 @@ const ArticlePageDetail = () => {
                       case 'heading':
                         return (
                           <>
-                            {/* Compact heading toolbar above remains */}
-                            {optionsOpen[block.id] && (
-                              <div className="mb-2 p-2 border rounded bg-gray-50 text-xs flex items-center justify-between">
-                                <div className="flex items-center gap-1">
-                                  {[1,2,3,4,5,6].map(l => (
-                                    <button
-                                      key={l}
-                                      className={`px-2 py-1 rounded border ${l === (block.data.level ?? 1) ? 'opacity-50 cursor-not-allowed bg-white' : 'hover:bg-white'}`}
-                                      disabled={l === (block.data.level ?? 1)}
-                                      onClick={()=> updateBlockAt(idx, { level: l })}
-                                      title={`H${l}`}
-                                    >
-                                      H{l}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button className={`px-2 py-1 rounded border ${block.data.align==='left' ? 'bg-white' : ''}`} onClick={()=>updateBlockAt(idx, { align: 'left' })} title="Align left">⟸</button>
-                                  <button className={`px-2 py-1 rounded border ${block.data.align==='center' ? 'bg-white' : ''}`} onClick={()=>updateBlockAt(idx, { align: 'center' })} title="Align center">↔</button>
-                                  <button className={`px-2 py-1 rounded border ${block.data.align==='right' ? 'bg-white' : ''}`} onClick={()=>updateBlockAt(idx, { align: 'right' })} title="Align right">⟹</button>
-                                </div>
-                                <button className="px-2 py-1 rounded border" onClick={()=>toggleOptions(block.id)} title="Close">✕</button>
-                              </div>
-                            )}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2">
+                              <HoverToolbar
+                                variant="heading"
+                                className=""
+                                level={(block.data.level ?? 1) as 1|2|3|4|5|6}
+                                align={(block.data.align as 'left'|'center'|'right') || 'left'}
+                                onLevelChange={(l)=>updateBlockAt(idx, { level: l })}
+                                onAlignChange={(a)=>updateBlockAt(idx, { align: a })}
+                                marks={(Array.isArray(block.data.marks) ? block.data.marks : []) as Array<'bold'|'italic'|'underline'|'strike'|'link'>}
+                                onBold={()=>{
+                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                  set.has('bold') ? set.delete('bold') : set.add('bold');
+                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                }}
+                                onItalic={()=>{
+                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                  set.has('italic') ? set.delete('italic') : set.add('italic');
+                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                }}
+                                onUnderline={()=>{
+                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                  set.has('underline') ? set.delete('underline') : set.add('underline');
+                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                }}
+                                onStrike={()=>{
+                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                  set.has('strike') ? set.delete('strike') : set.add('strike');
+                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                }}
+                              />
+                            </div>
 
                             <div>
                               <ToggleHeadingBlock
                                 content={block.data.content ?? ''}
                                 level={block.data.level ?? 1}
                                 align={(block.data.align as 'left'|'center'|'right') || 'left'}
+                                marks={(Array.isArray(block.data.marks) ? block.data.marks : []) as Array<'bold'|'italic'|'underline'|'strike'|'link'>}
                                 onChange={(val)=> updateBlockAt(idx, { content: val })}
                               />
                             </div>
@@ -323,45 +448,39 @@ const ArticlePageDetail = () => {
                           <div>
                             <ParagraphRich
                               spans={block.data.spans || [{ text: block.data.content || '' }]}
-                              align={block.data.align || 'left'}
-                              transform={block.data.transform || 'none'}
+                              items={block.data.items}
+                              align={(block.data.align as 'left'|'center'|'right'|'justify') || 'left'}
+                              transform={(block.data.transform as 'none'|'uppercase'|'lowercase'|'capitalize') || 'none'}
+                              list={(block.data.list as 'none'|'ul'|'ol') || 'none'}
                               onChange={(spans)=> setParagraphSpans(idx, spans)}
+                              onItemsChange={(items)=> updateBlockAt(idx, { items })}
+                              onAlignChange={(a)=> updateBlockAt(idx, { align: a })}
+                              onListChange={(l)=> {
+                                if (l === 'ul' || l === 'ol') {
+                                  const hasItems = Array.isArray(block.data.items) && block.data.items.length > 0;
+                                  const initialSpans = block.data.spans || [{ text: block.data.content || '' }];
+                                  // Clear paragraph-specific fields when entering list mode to avoid caret/placeholder conflicts
+                                  updateBlockAt(idx, {
+                                    list: l,
+                                    items: hasItems ? block.data.items : [{ spans: initialSpans }],
+                                    spans: undefined,
+                                    content: undefined,
+                                    transform: undefined,
+                                  });
+                                } else {
+                                  // Leaving list mode, keep text by collapsing items back into one span
+                                  const mergedText = Array.isArray(block.data.items) && block.data.items.length
+                                    ? (block.data.items.map(it => (it.spans?.[0]?.text || '')).join('\n'))
+                                    : '';
+                                  updateBlockAt(idx, { list: 'none', items: undefined, spans: [{ text: mergedText }] });
+                                }
+                              }}
                             />
-                            {/* Placeholder when empty */}
-                            {(!block.data.spans && !block.data.content) && (
+                            {/* Placeholder only for plain paragraphs */}
+                            {((!block.data.list || block.data.list === 'none') && !block.data.spans && !block.data.content) && (
                               <span className="pointer-events-none absolute left-4 top-2 text-gray-400 opacity-40">Paragraph</span>
                             )}
-                            {optionsOpen[block.id] && (
-                              <div className="mt-2 p-3 border rounded bg-gray-50 text-xs">
-                                <div className="font-semibold mb-2">Paragraph Options</div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span>Align</span>
-                                  <select
-                                    value={block.data.align || 'left'}
-                                    onChange={(e)=>updateBlockAt(idx, { align: e.target.value as 'left'|'center'|'right'|'justify' })}
-                                    className="border rounded px-2 py-1"
-                                  >
-                                    <option value="left">Left</option>
-                                    <option value="center">Center</option>
-                                    <option value="right">Right</option>
-                                    <option value="justify">Justify</option>
-                                  </select>
-                                </div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span>Case</span>
-                                  <select
-                                    value={block.data.transform || 'none'}
-                                    onChange={(e)=>updateBlockAt(idx, { transform: e.target.value as 'none'|'uppercase'|'lowercase'|'capitalize' })}
-                                    className="border rounded px-2 py-1"
-                                  >
-                                    <option value="none">None</option>
-                                    <option value="uppercase">Uppercase</option>
-                                    <option value="lowercase">Lowercase</option>
-                                    <option value="capitalize">Capitalize</option>
-                                  </select>
-                                </div>
-                              </div>
-                            )}
+                            {/* List toggles moved to ParagraphRich toolbar */}
                           </div>
                         );
                       case 'blockquote':
@@ -432,12 +551,30 @@ const ArticlePageDetail = () => {
             <BlockPanel />
             <div className="bg-white rounded-xl shadow p-4">
               <div className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Featured Image</div>
-              <ImageUploader
-                mode="single"
-                images={article?.featuredImage ? [{ src: article.featuredImage }] : []}
-                allowGallery={false}
-                onChange={(imgs)=> setFeaturedImage(imgs[0]?.src)}
-              />
+              {/* If there's a featured image path from API, show it via backend URL */}
+        {article?.featuredImage ? (
+                <div className="border rounded p-3 min-h-[120px] flex items-center justify-center bg-gray-50">
+                  <div className="relative">
+                    <img
+          src={featuredBlobURL || imageURL(article.featuredImage)}
+                      alt="Featured"
+                      className="max-h-48 object-contain rounded"
+                    />
+                    <button
+                      className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border"
+                      onClick={()=> setFeaturedImage(undefined)}
+                      title="Remove"
+                    >×</button>
+                  </div>
+                </div>
+              ) : (
+                <ImageUploader
+                  mode="single"
+                  images={[]}
+                  allowGallery={false}
+                  onChange={(imgs)=> setFeaturedImage(imgs[0]?.src)}
+                />
+              )}
             </div>
           </div>
         </div>

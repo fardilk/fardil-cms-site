@@ -13,6 +13,10 @@ export type ParagraphSpan = {
   href?: string; // only when marks includes 'link'
 };
 
+export type ParagraphListItem = {
+  spans: ParagraphSpan[]; // spans composing a single list item
+};
+
 export type ContentBlock = {
   id: string;
   type: string;
@@ -22,6 +26,7 @@ export type ContentBlock = {
     // headings
     level?: number;
     headingStyle?: HeadingStyle;
+  marks?: Array<'bold'|'italic'|'underline'|'strike'|'link'>;
     // images
     src?: string;
     alt?: string;
@@ -41,7 +46,9 @@ export type ContentBlock = {
     align?: TextAlign;
     transform?: TextTransform;
     variant?: ParagraphVariant;
-    spans?: ParagraphSpan[];
+  list?: 'none'|'ul'|'ol';
+    spans?: ParagraphSpan[]; // used when list === 'none'
+    items?: ParagraphListItem[]; // used when list is 'ul' or 'ol'
   };
 };
 
