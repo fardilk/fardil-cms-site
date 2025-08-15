@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'react-hot-toast';
 import { useParams, Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/GlobalLayout';
 import { useEffect, useState, useRef } from 'react';
@@ -24,6 +25,7 @@ const ArticlePageDetail = () => {
   const [slug, setSlug] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
   const [error, setError] = useState<string>('');
   const [featuredBlobURL, setFeaturedBlobURL] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -69,6 +71,42 @@ const ArticlePageDetail = () => {
         return res.json();
       })
       .then((data) => {
+        // Normalize API wrappers
+        const container = (val: unknown) => (val && typeof val === 'object' ? (val as Record<string, unknown>) : {});
+        const obj = container(data);
+        const wrapped = (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) ? obj.data
+          : (obj.article && typeof obj.article === 'object') ? obj.article
+          : (obj.result && typeof obj.result === 'object') ? obj.result
+          : obj;
+
+        // Cast to Record<string, any> for dynamic property access
+        const w = wrapped as Record<string, any>;
+        // Prefer .Content.blocks if available, fallback to .content.blocks
+        const blocksSource = w.Content?.blocks || w.content?.blocks;
+        const beBlocks = Array.isArray(blocksSource)
+          ? blocksSource.map((block: any) => {
+              // Normalize paragraph block: support both 'content' and 'text' fields
+              if (block.type === 'paragraph' && block.data) {
+                const data = { ...block.data };
+                if (typeof data.text === 'string' && !data.content) {
+                  data.content = data.text;
+                }
+                return {
+                  id: crypto.randomUUID(),
+                  type: block.type,
+                  data,
+                };
+              }
+              return {
+                id: crypto.randomUUID(),
+                type: block.type,
+                data: block.data,
+              };
+            })
+          : [];
+        setContentBlocks(beBlocks);
+
+        // Map other article fields as before
         type ApiArticle = {
           ID?: string; id?: string;
           Title?: string; title?: string;
@@ -81,15 +119,7 @@ const ArticlePageDetail = () => {
           FeaturedImage?: string; featured_image?: string;
           [key: string]: unknown;
         };
-        // Normalize common API wrappers: { data: {...} } | { article: {...} } | { result: {...} } | {...}
-        const container = (val: unknown) => (val && typeof val === 'object' ? (val as Record<string, unknown>) : {});
-        const obj = container(data);
-        const wrapped = (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) ? obj.data
-          : (obj.article && typeof obj.article === 'object') ? obj.article
-          : (obj.result && typeof obj.result === 'object') ? obj.result
-          : obj;
-        const a: ApiArticle = (wrapped as ApiArticle) || {};
-        const rawTags = (a.Tags ?? a.tags) as unknown;
+        const rawTags = (w.Tags ?? w.tags) as unknown;
         const tags: string[] = Array.isArray(rawTags)
           ? rawTags
               .map((t: unknown) => {
@@ -103,22 +133,24 @@ const ArticlePageDetail = () => {
               .filter((s: string) => s.length > 0)
           : [];
         const mapped: Article = {
-          id: a.ID ?? a.id ?? '',
-          title: a.Title ?? a.title ?? '',
-          status: a.Status ?? a.status,
-          category: a.Category ?? a.category,
-          excerpt: a.Excerpt ?? a.excerpt,
-          meta_description: a.MetaDescription ?? a.meta_description,
-          description: a.Description ?? a.description ?? a.Body ?? a.body ?? a.Content ?? a.content,
+          id: w.ID ?? w.id ?? '',
+          title: w.Title ?? w.title ?? '',
+          status: w.Status ?? w.status,
+          category: w.Category ?? w.category,
+          excerpt: w.Excerpt ?? w.excerpt,
+          meta_description: w.MetaDescription ?? w.meta_description,
+          description: w.Description ?? w.description ?? w.Body ?? w.body ?? w.Content ?? w.content,
+          // capture MetaDescription for editing (store in local state separately)
+          // no-op in Article shape
           tags,
-          featuredImage: a.FeaturedImage ?? a.featured_image,
+          featuredImage: w.FeaturedImage ?? w.featured_image,
         };
         setArticle(mapped);
+  setMetaDescription((w.MetaDescription ?? w.meta_description) ?? '');
         if (mapped.title) {
           setTitle(mapped.title);
           setSlug(slugify(mapped.title));
         }
-        if (mapped.description) setDescription(mapped.description);
       })
       .catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : 'Unknown error fetching article';
@@ -261,6 +293,71 @@ const ArticlePageDetail = () => {
     updateBlockAt(idx, { spans, content: undefined });
   };
 
+  // Build Content JSON from contentBlocks for backend (use 'text' for paragraphs to match API example)
+  const buildContentPayload = () => {
+    return {
+      blocks: contentBlocks.map(b => {
+        if (b.type === 'paragraph') {
+          const bd: any = b.data || {};
+          const text = bd.content ?? (Array.isArray(bd.spans) ? bd.spans.map((s:any)=>s.text).join('\n') : (bd.text ?? ''));
+          return { type: 'paragraph', data: { text } };
+        }
+        return { type: b.type, data: b.data };
+      })
+    };
+  };
+
+  const handleUpdate = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        // Persist title so preview shows the updated value
+        Title: title,
+        MetaDescription: metaDescription,
+        Content: buildContentPayload(),
+      };
+      const res = await apiFetch(`/api/articles/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Failed to update article ${id}`);
+      const data = await res.json();
+      // Unwrap potential API envelope
+      const container = (val: unknown) => (val && typeof val === 'object' ? (val as Record<string, unknown>) : {});
+      const obj = container(data);
+      const wrapped = (obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data)) ? obj.data
+        : (obj.article && typeof obj.article === 'object') ? obj.article
+        : (obj.result && typeof obj.result === 'object') ? obj.result
+        : obj;
+      const ww = wrapped as Record<string, any>;
+      // After successful update, reflect server state in FE
+      const updatedContent = (ww.Content && ww.Content.blocks) ? ww.Content.blocks : (ww.content && ww.content.blocks) ? ww.content.blocks : [];
+      const normalized = Array.isArray(updatedContent) ? updatedContent.map((block:any) => {
+        if (block.type === 'paragraph') {
+          const content = block.data.content ?? block.data.text ?? '';
+          return { id: crypto.randomUUID(), type: 'paragraph', data: { content } };
+        }
+        return { id: crypto.randomUUID(), type: block.type, data: block.data };
+      }) : [];
+      setContentBlocks(normalized);
+      // update meta description locally
+      setMetaDescription(ww.MetaDescription ?? ww.meta_description ?? metaDescription);
+      // update title locally if backend echoes it
+      const newTitle = ww.Title ?? ww.title ?? title;
+      setTitle(newTitle);
+      // keep slug in sync with title field
+      setSlug(slugify(newTitle));
+      toast.success('Sukses mengupdate artikel', { style: { background: '#22c55e', color: 'white' } });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Unknown error updating article');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const moveUp = (i: number) => {
     if (i <= 0) return;
     moveBlock(i, i - 1);
@@ -273,14 +370,23 @@ const ArticlePageDetail = () => {
   return (
     <DashboardLayout
       breadcrumbRight={(
-        <Link
-          to={`/preview/${id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center border rounded px-3 py-2 text-sm hover:bg-gray-50"
-        >
-          Open Preview
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/preview/${id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center border rounded px-3 py-2 text-sm hover:bg-gray-50"
+          >
+            Open Preview
+          </Link>
+          <button
+            onClick={() => handleUpdate()}
+            disabled={saving}
+            className="inline-flex items-center bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Update'}
+          </button>
+        </div>
       )}
     >
       <div>
@@ -316,227 +422,177 @@ const ArticlePageDetail = () => {
                   style={{ color: 'var(--text-primary)' }}
                 />
               </div>
-              <div className="mt-4">
-                <label className="block text-sm mb-1" style={{ color: 'var(--text-primary)' }}>Description</label>
-                <textarea
-                  className="w-full border rounded p-3 text-sm"
-                  rows={6}
-                  value={description}
-                  onChange={(e)=>setDescription(e.target.value)}
-                  placeholder="Write the article description..."
-                />
-                <div className="mt-2 flex gap-2">
-                  <button
-                    className="px-3 py-1 rounded border bg-blue-600 text-white"
-                    onClick={async ()=>{
-                      if (!id) return;
-                      // PUT update to backend
-                      try {
-                        setSaving(true);
-                        const payload = { description };
-                        let res = await apiFetch(`/api/articles/${id}`, {
-                          method: 'PUT',
-                          credentials: 'include',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(payload),
-                        });
-                        if (!res.ok && (res.status === 405 || res.status === 404)) {
-                          // Fallback for APIs that use POST to update
-                          res = await apiFetch(`/api/articles/${id}`, {
-                            method: 'POST',
-                            credentials: 'include',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
-                          });
-                        }
-                        if (!res.ok) throw new Error('Failed to update article');
-                        // Update local copy
-                        setArticle(prev => prev ? { ...prev, description } : prev);
-                        const t = await import('react-hot-toast');
-                        t.toast.success('Description saved');
-                      } catch (e) {
-                        console.error(e);
-                        const t = await import('react-hot-toast');
-                        t.toast.error('Failed to save');
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                    disabled={saving}
-                  >{saving ? 'Saving…' : 'Save'}</button>
-                  <button
-                    className="px-3 py-1 rounded border bg-gray-100"
-                    onClick={()=> setDescription(article?.description || '')}
-                  >Reset</button>
-                </div>
-              </div>
+             
             </div>
 
             {/* Rule B: render existing blocks; reordering handled inside DraggableBlock */}
-            {contentBlocks.map((block, idx) => (
-              <DraggableBlock key={block.id} id={block.id} index={idx} moveBlock={moveBlock}>
-                <div className="group relative">
-                  {/* Move controls on the right, show on hover */}
-                  <div className="absolute -right-10 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      className={`w-7 h-7 rounded border bg-white text-xs ${idx<=0 ? 'opacity-40 cursor-not-allowed' : ''}`}
-                      onClick={()=>moveUp(idx)}
-                      disabled={idx<=0}
-                      title="Move up"
-                    >↑</button>
-                    <button
-                      className={`w-7 h-7 rounded border bg-white text-xs ${idx>=contentBlocks.length-1 ? 'opacity-40 cursor-not-allowed' : ''}`}
-                      onClick={()=>moveDown(idx)}
-                      disabled={idx>=contentBlocks.length-1}
-                      title="Move down"
-                    >↓</button>
-                  </div>
-
-                  {/* Legacy options button removed */}
-
-                  {/* Block renderer */}
-                  {(() => {
-                    switch (block.type) {
-                      case 'heading':
-                        return (
-                          <>
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2">
-                              <HoverToolbar
-                                variant="heading"
-                                className=""
-                                level={(block.data.level ?? 1) as 1|2|3|4|5|6}
-                                align={(block.data.align as 'left'|'center'|'right') || 'left'}
-                                onLevelChange={(l)=>updateBlockAt(idx, { level: l })}
-                                onAlignChange={(a)=>updateBlockAt(idx, { align: a })}
-                                marks={(Array.isArray(block.data.marks) ? block.data.marks : []) as Array<'bold'|'italic'|'underline'|'strike'|'link'>}
-                                onBold={()=>{
-                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
-                                  set.has('bold') ? set.delete('bold') : set.add('bold');
-                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
-                                }}
-                                onItalic={()=>{
-                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
-                                  set.has('italic') ? set.delete('italic') : set.add('italic');
-                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
-                                }}
-                                onUnderline={()=>{
-                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
-                                  set.has('underline') ? set.delete('underline') : set.add('underline');
-                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
-                                }}
-                                onStrike={()=>{
-                                  const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
-                                  set.has('strike') ? set.delete('strike') : set.add('strike');
-                                  updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
-                                }}
-                              />
-                            </div>
-
+            {Array.isArray(contentBlocks) && contentBlocks.length > 0 ? (
+              contentBlocks.map((block, idx) => (
+                <DraggableBlock key={block.id} id={block.id} index={idx} moveBlock={moveBlock}>
+                  <div className="group relative">
+                    {/* Move controls on the right, show on hover */}
+                    <div className="absolute -right-10 top-1/2 -translate-y-1/2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        className={`w-7 h-7 rounded border bg-white text-xs ${idx<=0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        onClick={()=>moveUp(idx)}
+                        disabled={idx<=0}
+                        title="Move up"
+                      >↑</button>
+                      <button
+                        className={`w-7 h-7 rounded border bg-white text-xs ${idx>=contentBlocks.length-1 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        onClick={()=>moveDown(idx)}
+                        disabled={idx>=contentBlocks.length-1}
+                        title="Move down"
+                      >↓</button>
+                    </div>
+                    {/* Legacy options button removed */}
+                    {/* Block renderer */}
+                    {(() => {
+                      switch (block.type) {
+                        case 'heading':
+                          return (
+                            <>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2">
+                                <HoverToolbar
+                                  variant="heading"
+                                  className=""
+                                  level={(block.data.level ?? 1) as 1|2|3|4|5|6}
+                                  align={(block.data.align as 'left'|'center'|'right') || 'left'}
+                                  onLevelChange={(l)=>updateBlockAt(idx, { level: l })}
+                                  onAlignChange={(a)=>updateBlockAt(idx, { align: a })}
+                                  marks={(Array.isArray(block.data.marks) ? block.data.marks : []) as Array<'bold'|'italic'|'underline'|'strike'|'link'>}
+                                  onBold={()=>{
+                                    const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                    set.has('bold') ? set.delete('bold') : set.add('bold');
+                                    updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                  }}
+                                  onItalic={()=>{
+                                    const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                    set.has('italic') ? set.delete('italic') : set.add('italic');
+                                    updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                  }}
+                                  onUnderline={()=>{
+                                    const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                    set.has('underline') ? set.delete('underline') : set.add('underline');
+                                    updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                  }}
+                                  onStrike={()=>{
+                                    const set = new Set<'bold'|'italic'|'underline'|'strike'|'link'>(Array.isArray(block.data.marks) ? block.data.marks as Array<'bold'|'italic'|'underline'|'strike'|'link'> : []);
+                                    set.has('strike') ? set.delete('strike') : set.add('strike');
+                                    updateBlockAt(idx, { marks: Array.from(set) as Array<'bold'|'italic'|'underline'|'strike'|'link'> });
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <ToggleHeadingBlock
+                                  content={block.data.content ?? ''}
+                                  level={block.data.level ?? 1}
+                                  align={(block.data.align as 'left'|'center'|'right') || 'left'}
+                                  marks={(Array.isArray(block.data.marks) ? block.data.marks : []) as Array<'bold'|'italic'|'underline'|'strike'|'link'>}
+                                  onChange={(val)=> updateBlockAt(idx, { content: val })}
+                                />
+                              </div>
+                            </>
+                          );
+                        case 'paragraph':
+                          return (
                             <div>
-                              <ToggleHeadingBlock
-                                content={block.data.content ?? ''}
-                                level={block.data.level ?? 1}
-                                align={(block.data.align as 'left'|'center'|'right') || 'left'}
-                                marks={(Array.isArray(block.data.marks) ? block.data.marks : []) as Array<'bold'|'italic'|'underline'|'strike'|'link'>}
-                                onChange={(val)=> updateBlockAt(idx, { content: val })}
+                              <ParagraphRich
+                                spans={block.data.spans || [{ text: block.data.content || '' }]}
+                                items={block.data.items}
+                                align={(block.data.align as 'left'|'center'|'right'|'justify') || 'left'}
+                                transform={(block.data.transform as 'none'|'uppercase'|'lowercase'|'capitalize') || 'none'}
+                                list={(block.data.list as 'none'|'ul'|'ol') || 'none'}
+                                onChange={(spans)=> setParagraphSpans(idx, spans)}
+                                onItemsChange={(items)=> updateBlockAt(idx, { items })}
+                                onAlignChange={(a)=> updateBlockAt(idx, { align: a })}
+                                onListChange={(l)=> {
+                                  if (l === 'ul' || l === 'ol') {
+                                    const hasItems = Array.isArray(block.data.items) && block.data.items.length > 0;
+                                    const initialSpans = block.data.spans || [{ text: block.data.content || '' }];
+                                    // Clear paragraph-specific fields when entering list mode to avoid caret/placeholder conflicts
+                                    updateBlockAt(idx, {
+                                      list: l,
+                                      items: hasItems ? block.data.items : [{ spans: initialSpans }],
+                                      spans: undefined,
+                                      content: undefined,
+                                      transform: undefined,
+                                    });
+                                  } else {
+                                    // Leaving list mode, keep text by collapsing items back into one span
+                                    const mergedText = Array.isArray(block.data.items) && block.data.items.length
+                                      ? (block.data.items.map(it => (it.spans?.[0]?.text || '')).join('\n'))
+                                      : '';
+                                    updateBlockAt(idx, { list: 'none', items: undefined, spans: [{ text: mergedText }] });
+                                  }
+                                }}
                               />
+                              {/* Placeholder only for plain paragraphs */}
+                              {((!block.data.list || block.data.list === 'none') && !block.data.spans && !block.data.content) && (
+                                <span className="pointer-events-none absolute left-4 top-2 text-gray-400 opacity-40">Paragraph</span>
+                              )}
+                              {/* List toggles moved to ParagraphRich toolbar */}
                             </div>
-                          </>
-                        );
-                      case 'paragraph':
-                        return (
-                          <div>
-                            <ParagraphRich
-                              spans={block.data.spans || [{ text: block.data.content || '' }]}
-                              items={block.data.items}
-                              align={(block.data.align as 'left'|'center'|'right'|'justify') || 'left'}
-                              transform={(block.data.transform as 'none'|'uppercase'|'lowercase'|'capitalize') || 'none'}
-                              list={(block.data.list as 'none'|'ul'|'ol') || 'none'}
-                              onChange={(spans)=> setParagraphSpans(idx, spans)}
-                              onItemsChange={(items)=> updateBlockAt(idx, { items })}
-                              onAlignChange={(a)=> updateBlockAt(idx, { align: a })}
-                              onListChange={(l)=> {
-                                if (l === 'ul' || l === 'ol') {
-                                  const hasItems = Array.isArray(block.data.items) && block.data.items.length > 0;
-                                  const initialSpans = block.data.spans || [{ text: block.data.content || '' }];
-                                  // Clear paragraph-specific fields when entering list mode to avoid caret/placeholder conflicts
-                                  updateBlockAt(idx, {
-                                    list: l,
-                                    items: hasItems ? block.data.items : [{ spans: initialSpans }],
-                                    spans: undefined,
-                                    content: undefined,
-                                    transform: undefined,
-                                  });
-                                } else {
-                                  // Leaving list mode, keep text by collapsing items back into one span
-                                  const mergedText = Array.isArray(block.data.items) && block.data.items.length
-                                    ? (block.data.items.map(it => (it.spans?.[0]?.text || '')).join('\n'))
-                                    : '';
-                                  updateBlockAt(idx, { list: 'none', items: undefined, spans: [{ text: mergedText }] });
-                                }
-                              }}
+                          );
+                        case 'blockquote':
+                          return (
+                            <Blockquote
+                              content={block.data.content ?? ''}
+                              onChange={(val)=> updateBlockAt(idx, { content: val })}
                             />
-                            {/* Placeholder only for plain paragraphs */}
-                            {((!block.data.list || block.data.list === 'none') && !block.data.spans && !block.data.content) && (
-                              <span className="pointer-events-none absolute left-4 top-2 text-gray-400 opacity-40">Paragraph</span>
-                            )}
-                            {/* List toggles moved to ParagraphRich toolbar */}
-                          </div>
-                        );
-                      case 'blockquote':
-                        return (
-                          <Blockquote
-                            content={block.data.content ?? ''}
-                            onChange={(val)=> updateBlockAt(idx, { content: val })}
-                          />
-                        );
-                      case 'pullquote':
-                        return (
-                          <PullQuote
-                            content={block.data.content ?? ''}
-                            onChange={(val)=> updateBlockAt(idx, { content: val })}
-                          />
-                        );
-                      case 'code':
-                        return (
-                          <CodeBlock
-                            code={block.data.code ?? ''}
-                            onChange={(val)=> updateBlockAt(idx, { code: val })}
-                          />
-                        );
-                      case 'image':
-                        return (
-                          <ImageUploader
-                            mode={(block.data.mode as 'single'|'gallery') || 'single'}
-                            images={block.data.images || []}
-                            onChange={(imgs, mode)=> updateBlockAt(idx, { images: imgs, mode })}
-                          />
-                        );
-                      case 'video':
-                        return (
-                          <VideoBlock
-                            url={block.data.url}
-                            mode={(block.data.videoMode as 'embed'|'upload') || 'embed'}
-                            onChange={(data)=> updateBlockAt(idx, { url: data.url, videoSrc: data.videoSrc, videoMode: data.mode })}
-                          />
-                        );
-                      case 'table':
-                        return (
-                          <TableBlock
-                            rows={block.data.rows}
-                            cols={block.data.cols}
-                            onChange={(cells)=> updateBlockAt(idx, { cells })}
-                          />
-                        );
-                      case 'divider':
-                        return <DividerBlock />;
-                      default:
-                        return null;
-                    }
-                  })()}
-                </div>
-              </DraggableBlock>
-            ))}
+                          );
+                        case 'pullquote':
+                          return (
+                            <PullQuote
+                              content={block.data.content ?? ''}
+                              onChange={(val)=> updateBlockAt(idx, { content: val })}
+                            />
+                          );
+                        case 'code':
+                          return (
+                            <CodeBlock
+                              code={block.data.code ?? ''}
+                              onChange={(val)=> updateBlockAt(idx, { code: val })}
+                            />
+                          );
+                        case 'image':
+                          return (
+                            <ImageUploader
+                              mode={(block.data.mode as 'single'|'gallery') || 'single'}
+                              images={block.data.images || []}
+                              onChange={(imgs, mode)=> updateBlockAt(idx, { images: imgs, mode })}
+                            />
+                          );
+                        case 'video':
+                          return (
+                            <VideoBlock
+                              url={block.data.url}
+                              mode={(block.data.videoMode as 'embed'|'upload') || 'embed'}
+                              onChange={(data)=> updateBlockAt(idx, { url: data.url, videoSrc: data.videoSrc, videoMode: data.mode })}
+                            />
+                          );
+                        case 'table':
+                          return (
+                            <TableBlock
+                              rows={block.data.rows}
+                              cols={block.data.cols}
+                              onChange={(cells)=> updateBlockAt(idx, { cells })}
+                            />
+                          );
+                        case 'divider':
+                          return <DividerBlock />;
+                        default:
+                          return null;
+                      }
+                    })()}
+                  </div>
+                </DraggableBlock>
+              ))
+            ) : (
+              <div className="rounded bg-gray-50 p-6 text-center text-gray-400 text-lg">
+                No content yet. Add blocks from the right panel or start editing!
+              </div>
+            )}
 
             {/* Rule A: show exactly one end dropzone while dragging a panel item */}
             {isDraggingPanel && (

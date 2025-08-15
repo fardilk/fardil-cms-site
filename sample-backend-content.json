@@ -1,0 +1,52 @@
+// Sample backend JSON response for article content blocks
+// This matches what you get from:
+// curl -s http://localhost:8000/api/articles/3 | jq -c '.Content'
+
+{
+  "blocks": [
+    {
+      "type": "paragraph",
+      "data": {
+        "content": "This is a paragraph from the backend."
+      }
+    },
+    {
+      "type": "heading",
+      "data": {
+        "content": "Section Title",
+        "level": 2
+      }
+    },
+    {
+      "type": "image",
+      "data": {
+        "images": ["img1.png"],
+        "mode": "single"
+      }
+    },
+    {
+      "type": "divider",
+      "data": {}
+    }
+  ]
+}
+
+// Frontend mapping in ArticlePageDetail.tsx:
+// Each block in blocks[] is mapped to a FE block and rendered as:
+// - type: 'paragraph' => <ParagraphRich ... />
+// - type: 'heading'   => <ToggleHeadingBlock ... />
+// - type: 'image'     => <ImageUploader ... />
+// - type: 'divider'   => <DividerBlock />
+// ...etc.
+
+// The FE code uses:
+//   Array.isArray(w.content?.blocks)
+//     ? w.content.blocks.map((block: any) => ({
+//         id: crypto.randomUUID(),
+//         type: block.type,
+//         data: block.data,
+//       }))
+//     : [];
+//   setContentBlocks(beBlocks);
+//
+// This ensures each backend block is rendered in the dropzone as the correct FE block type.
