@@ -2,6 +2,7 @@ import DashboardLayout from '@/components/layout/GlobalLayout';
 import { useState } from 'react';
 import { useArticle } from '../hooks/useArticle';
 import { useNavigate } from 'react-router-dom';
+import { imageURL } from '@/lib/api';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -50,7 +51,7 @@ const ArticlePage = () => {
               {/* Image */}
               <div className="w-full aspect-video bg-gray-200 rounded-t-lg overflow-hidden flex items-center justify-center">
                 <img
-                  src={article.featuredImage ? `http://localhost:8000/images/${article.featuredImage.split('/').pop()}` : 'http://localhost:8000/images/default-image.png'}
+                  src={imageURL(article.featuredImage || '/images/default-image.png')}
                   alt={article.title}
                   className="object-cover w-full h-full"
                   style={{ aspectRatio: '16/9' }}

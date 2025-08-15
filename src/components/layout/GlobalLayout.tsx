@@ -4,12 +4,14 @@ import Topbar from './Topbar';
 import Breadcrumbs from '../atoms/Breadcrumbs';
 import { logout } from '../func/logout';
 import { useNavigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 type GlobalLayoutProps = {
   children: React.ReactNode;
+  breadcrumbRight?: React.ReactNode;
 };
 
-const GlobalLayout: React.FC<GlobalLayoutProps> = ({ children }) => {
+const GlobalLayout: React.FC<GlobalLayoutProps> = ({ children, breadcrumbRight }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -22,7 +24,11 @@ const GlobalLayout: React.FC<GlobalLayoutProps> = ({ children }) => {
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar onLogout={handleLogout} />
         <main className="flex-1 w-full p-8 overflow-auto">
-          <Breadcrumbs />
+          <Toaster position="top-right" />
+          <div className="flex items-center justify-between mb-4">
+            <Breadcrumbs />
+            <div>{breadcrumbRight}</div>
+          </div>
           {children}
         </main>
       </div>

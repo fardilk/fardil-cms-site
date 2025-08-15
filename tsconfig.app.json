@@ -13,7 +13,8 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "jsx": "react-jsx",
+  "jsx": "react-jsx",
+  "types": ["react", "react-dom", "vite/client"],
 
     /* Linting */
     "strict": true,
@@ -21,7 +22,7 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+  "noUncheckedSideEffectImports": true
   },
   "include": ["src"]
 }

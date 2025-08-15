@@ -7,6 +7,7 @@ export type Article = {
   category?: string;
   excerpt?: string;
   meta_description?: string;
+  description?: string;
   tags?: string[];
   featuredImage?: string;
   // other fields...
@@ -40,6 +41,12 @@ export function useArticle() {
           excerpt?: string;
           MetaDescription?: string;
           meta_description?: string;
+          Description?: string;
+          description?: string;
+          Body?: string;
+          body?: string;
+          Content?: string;
+          content?: string;
           Tags?: string[];
           tags?: string[];
           FeaturedImage?: string;
@@ -54,6 +61,7 @@ export function useArticle() {
               category: a.Category ?? a.category,
               excerpt: a.Excerpt ?? a.excerpt,
               meta_description: a.MetaDescription ?? a.meta_description,
+              description: a.Description ?? a.description ?? a.Body ?? a.body ?? a.Content ?? a.content,
               tags: a.Tags ?? a.tags,
               featuredImage: a.FeaturedImage ?? a.featured_image,
               ...a,
