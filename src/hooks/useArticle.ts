@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 export type Article = {
   id: string;
@@ -21,7 +22,7 @@ export function useArticle() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    fetch('http://localhost:8000/api/articles', { credentials: 'include' })
+  apiFetch('/api/articles', { credentials: 'include' })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch articles');
         return res.json();

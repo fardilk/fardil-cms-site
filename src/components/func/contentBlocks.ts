@@ -32,8 +32,8 @@ export type ContentBlock = {
     alt?: string;
     images?: ContentImage[];
     mode?: 'single' | 'gallery';
-    // code
-    code?: string;
+  // raw HTML snippet
+  html?: string;
     // video
     url?: string;
     videoMode?: 'embed' | 'upload';

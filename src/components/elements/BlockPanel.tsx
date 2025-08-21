@@ -21,7 +21,7 @@ const BlockPanel: React.FC = () => {
         <AccordionSection title="Others" open={open.others} onToggle={()=>setOpen(o=>({...o,others:!o.others}))}>
           <ElementItem type="blockquote" icon={<i className="fas fa-quote-left text-gray-400"></i>} label="Blockquote" />
           <ElementItem type="pullquote" icon={<i className="fas fa-quote-right text-gray-400"></i>} label="Pull Quote" />
-          <ElementItem type="code" icon={<i className="fas fa-code text-gray-500"></i>} label="Code Block" />
+          <ElementItem type="rawhtml" icon={<i className="fas fa-code text-purple-500"></i>} label="Code Snippet" />
           <ElementItem type="table" icon={<i className="fas fa-table text-gray-500"></i>} label="Table" />
           <ElementItem type="divider" icon={<i className="fas fa-minus w-8 text-blue-200 text-xl"></i>} label="Divider" />
         </AccordionSection>
