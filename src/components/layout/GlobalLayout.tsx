@@ -4,7 +4,7 @@ import Topbar from './Topbar';
 import Breadcrumbs from '../atoms/Breadcrumbs';
 import { logout } from '../func/logout';
 import { useNavigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+// Toaster is provided at App level to avoid duplicates
 
 type GlobalLayoutProps = {
   children: React.ReactNode;
@@ -23,8 +23,7 @@ const GlobalLayout: React.FC<GlobalLayoutProps> = ({ children, breadcrumbRight }
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar onLogout={handleLogout} />
-        <main className="flex-1 w-full p-8 overflow-auto">
-          <Toaster position="top-right" />
+  <main className="flex-1 w-full p-8 overflow-auto">
           <div className="flex items-center justify-between mb-4">
             <Breadcrumbs />
             <div>{breadcrumbRight}</div>

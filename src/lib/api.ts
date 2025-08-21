@@ -1,7 +1,9 @@
-export const baseURL = 'http://localhost:8000';
+// Uses Vite env: define VITE_API_BASE_URL in .env files (e.g., http://localhost:8000 or https://api.example.com)
+export const baseURL: string = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export async function apiFetch(path: string, options?: RequestInit) {
-  const response = await fetch(`${baseURL}${path}`, options);
+  const url = /^(https?:)?\/\//i.test(path) ? path : `${baseURL}${path}`;
+  const response = await fetch(url, options);
   return response;
 }
 

@@ -1,5 +1,7 @@
+import { apiFetch } from '@/lib/api';
+
 export const logout = async (navigate: (path: string) => void) => {
-  await fetch('http://localhost:8000/logout', {
+  await apiFetch('/logout', {
     method: 'POST',
     credentials: 'include',
   });

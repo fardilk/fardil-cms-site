@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { apiFetch } from '@/lib/api';
 
 export function useLoginHandler() {
   const [message, setMessage] = useState<string | null>(null);
@@ -17,7 +18,7 @@ export function useLoginHandler() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/login', {
+      const response = await apiFetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

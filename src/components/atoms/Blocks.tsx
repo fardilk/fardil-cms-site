@@ -1,4 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import type { Align, Transform, ListKind, RichSpan, ParagraphListItem } from './rich/types';
+import ParagraphEditor from './rich/ParagraphEditor';
+import ListEditor from './rich/ListEditor';
+import { normalizeSpans } from './rich/utils';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { ContentImage } from '@/components/func/contentBlocks';
@@ -7,18 +11,25 @@ export const ToggleHeadingBlock = ({
   content,
   level = 1,
   onChange,
+  onLevelChange,
   align = 'left',
   marks = [],
+  editable = true,
+  toolbarVisible = false,
 }: {
   content: string;
   level?: number;
   onChange?: (val: string) => void;
-  align?: 'left'|'center'|'right';
-  marks?: Array<'bold'|'italic'|'underline'|'strike'|'link'>;
+  onLevelChange?: (lvl: number) => void;
+  align?: 'left' | 'center' | 'right';
+  marks?: Array<'bold' | 'italic' | 'underline' | 'strike' | 'link'>;
+  editable?: boolean;
+  toolbarVisible?: boolean;
 }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
-  const lvl = Math.min(6, Math.max(1, level ?? 1));
+  const [showToolbar, setShowToolbar] = useState(false);
+  const lvl = Math.min(5, Math.max(1, level ?? 1)); // Only H1-H5
   const headingRef = useRef<HTMLElement | null>(null);
 
   const placeCaretAtEnd = () => {
@@ -35,13 +46,11 @@ export const ToggleHeadingBlock = ({
   const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
     const text = e.currentTarget.textContent || '';
     setValue(text);
-    setEditing(false);
+  if (!toolbarVisible) setEditing(false);
     onChange?.(text);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
-    // Keep caret at end so typing appends on the right
-    placeCaretAtEnd();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const text = (e.currentTarget as HTMLElement).textContent || '';
@@ -52,42 +61,66 @@ export const ToggleHeadingBlock = ({
     }
   };
 
+  const handleLevelChange = (newLevel: number) => {
+    onLevelChange?.(newLevel);
+    setShowToolbar(false);
+  };
+
   const sizeClass = (
     lvl === 1 ? 'text-4xl md:text-5xl' :
-    lvl === 2 ? 'text-3xl md:text-4xl' :
-    lvl === 3 ? 'text-2xl md:text-3xl' :
-    lvl === 4 ? 'text-xl md:text-2xl' :
-    lvl === 5 ? 'text-lg' :
-    'text-base'
+      lvl === 2 ? 'text-3xl md:text-4xl' :
+        lvl === 3 ? 'text-2xl md:text-3xl' :
+          lvl === 4 ? 'text-xl md:text-2xl' :
+            'text-lg'
   );
 
   const Tag: string = `h${lvl}`;
 
-  const styleMarks: React.CSSProperties = {
-    fontWeight: marks.includes('bold') ? 700 : 400,
-    fontStyle: marks.includes('italic') ? 'italic' : 'normal',
-    textDecoration: `${marks.includes('underline') ? 'underline ' : ''}${marks.includes('strike') ? 'line-through' : ''}`.trim() || 'none',
-  };
-
   return (
-    <div className="my-2 relative">
-      {React.createElement(
+    <div className="my-2 relative group">
+    {/* Explicit toolbar controlled by parent */}
+  {editable && toolbarVisible && (
+        <div className="absolute top-10 right-2 z-30 bg-white rounded shadow-lg border border-gray-200 p-2 flex flex-col gap-1">
+          {[1, 2, 3, 4, 5].map(h => (
+            <button
+              key={h}
+              className={`px-3 py-1 text-sm rounded hover:bg-gray-100 text-left ${lvl === h ? 'bg-blue-100 text-blue-600' : ''}`}
+              onClick={() => handleLevelChange(h)}
+            >
+              H{h}
+            </button>
+          ))}
+        </div>
+      )}
+
+  {React.createElement(
         Tag,
-        {
-          ref: (el: HTMLElement | null) => { headingRef.current = el; },
-          className: `rounded-lg px-4 py-2 ${sizeClass}`,
-          contentEditable: editing,
-          suppressContentEditableWarning: true,
-          onBlur: handleBlur,
-          onKeyDown: handleKeyDown,
-          onFocus: () => placeCaretAtEnd(),
-          tabIndex: 0,
-          onClick: () => { setEditing(true); placeCaretAtEnd(); },
-          style: { userSelect: 'text', cursor: 'text', textAlign: align, color: 'var(--text-primary)', ...styleMarks },
-        },
+        editable
+          ? {
+              ref: (el: HTMLElement | null) => { headingRef.current = el; },
+              className: `bg-gray-50 rounded-lg px-4 py-2 whitespace-pre-wrap transition-colors border border-gray-200 ${sizeClass}`,
+              contentEditable: true,
+              suppressContentEditableWarning: true,
+              onBlur: handleBlur,
+              onKeyDown: handleKeyDown,
+      onFocus: () => { setEditing(true); },
+      onClick: () => { setEditing(true); },
+              tabIndex: 0,
+              style: {
+                textAlign: align,
+                color: 'var(--text-primary)',
+                cursor: 'text',
+                caretColor: '#3b82f6',
+                outline: 'none',
+              },
+            }
+          : {
+              className: `${sizeClass} my-2`,
+              style: { textAlign: align, color: 'var(--text-primary)' },
+            },
         value
       )}
-      {(!value || value.length === 0) && !editing && (
+  {editable && (!value || value.length === 0) && !editing && (
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 opacity-40 select-none" style={{ color: 'var(--text-primary)' }}>
           Heading
         </span>
@@ -132,14 +165,20 @@ export const ParagraphBlock = ({
       onKeyDown={handleKeyDown}
       tabIndex={0}
       onClick={() => setEditing(true)}
-      style={{ userSelect: 'text', cursor: 'text', color: 'var(--text-primary)' }}
+      style={{
+        userSelect: 'text',
+        cursor: 'text',
+        color: 'var(--text-primary)',
+        top: '-3em',
+        minHeight: '32px'
+      }}
     >
       {value}
     </div>
   );
 };
 
-export const Blockquote = ({ content, onChange }: { content: string; onChange?: (v:string)=>void }) => {
+export const Blockquote = ({ content, onChange }: { content: string; onChange?: (v: string) => void }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
   const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
@@ -162,7 +201,7 @@ export const Blockquote = ({ content, onChange }: { content: string; onChange?: 
   );
 };
 
-export const PullQuote = ({ content, onChange }: { content: string; onChange?: (v:string)=>void }) => {
+export const PullQuote = ({ content, onChange }: { content: string; onChange?: (v: string) => void }) => {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
   const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
@@ -187,33 +226,7 @@ export const PullQuote = ({ content, onChange }: { content: string; onChange?: (
   );
 };
 
-export const CodeBlock = ({ code, onChange }: { code: string; onChange?: (code:string)=>void }) => {
-  const [value, setValue] = useState(code);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(value); } catch { /* noop */ }
-  };
-  return (
-    <div className="my-3 rounded-md border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-3 py-2 flex justify-between items-center">
-        <span className="text-xs text-gray-500">Code</span>
-        <button className="text-xs px-2 py-1 border rounded hover:bg-gray-100" onClick={copy}>Copy</button>
-      </div>
-      <div className="grid grid-cols-2 gap-0">
-        <textarea
-          value={value}
-          onChange={(e)=>{ setValue(e.target.value); onChange?.(e.target.value); }}
-          className="p-3 font-mono text-sm outline-none resize-y min-h-[120px]"
-          placeholder="Write code..."
-        />
-        <div className="p-3 overflow-auto bg-white">
-          <SyntaxHighlighter language="javascript" style={oneLight} customStyle={{ margin: 0 }}>
-            {value}
-          </SyntaxHighlighter>
-        </div>
-      </div>
-    </div>
-  );
-};
+// CodeBlock removed — replaced by rawhtml (Code Snippet) block
 
 export const PreformattedBlock = ({ text }: { text: string }) => (
   <pre className="whitespace-pre my-3 p-3 font-mono text-sm bg-gray-50 rounded border border-gray-200">{text}</pre>
@@ -227,15 +240,15 @@ export const ImageUploader = ({
 }: {
   mode?: 'single' | 'gallery';
   images?: ContentImage[];
-  onChange?: (imgs: ContentImage[], mode: 'single'|'gallery') => void;
+  onChange?: (imgs: ContentImage[], mode: 'single' | 'gallery') => void;
   allowGallery?: boolean;
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [localImages, setLocalImages] = useState<ContentImage[]>(images);
-  const [currentMode, setCurrentMode] = useState<'single'|'gallery'>(mode);
-  const effectiveMode: 'single'|'gallery' = allowGallery ? currentMode : 'single';
+  const [currentMode, setCurrentMode] = useState<'single' | 'gallery'>(mode);
+  const effectiveMode: 'single' | 'gallery' = allowGallery ? currentMode : 'single';
   const maxSize = 2 * 1024 * 1024; // 2MB
-  const accept = ['image/png','image/jpeg','image/jpg','image/gif'];
+  const accept = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif'];
 
   // Keep internal state in sync when parent updates images
   useEffect(() => {
@@ -251,7 +264,7 @@ export const ImageUploader = ({
       const url = URL.createObjectURL(f);
       selected.push({ src: url, alt: f.name });
     });
-    const next = effectiveMode === 'single' ? selected.slice(0,1) : selected.slice(0,3);
+    const next = effectiveMode === 'single' ? selected.slice(0, 1) : selected.slice(0, 3);
     setLocalImages(next);
     onChange?.(next, effectiveMode);
   };
@@ -261,10 +274,10 @@ export const ImageUploader = ({
     onFiles(e.dataTransfer.files);
   };
 
-  const clearAt = (idx:number) => {
+  const clearAt = (idx: number) => {
     setLocalImages(prev => {
       const copy = [...prev];
-      copy.splice(idx,1);
+      copy.splice(idx, 1);
       onChange?.(copy, effectiveMode);
       return copy;
     });
@@ -276,7 +289,7 @@ export const ImageUploader = ({
         {allowGallery && (
           <select
             value={effectiveMode}
-            onChange={(e)=>{ const m = e.target.value as 'single'|'gallery'; setCurrentMode(m); onChange?.(localImages, m); }}
+            onChange={(e) => { const m = e.target.value as 'single' | 'gallery'; setCurrentMode(m); onChange?.(localImages, m); }}
             className="border rounded px-2 py-1 text-xs"
           >
             <option value="single">Single image</option>
@@ -285,26 +298,26 @@ export const ImageUploader = ({
         )}
         <button className="ml-auto px-3 py-1 text-xs border rounded hover:bg-gray-50" onClick={pick}>Upload image{allowGallery ? '(s)' : ''}</button>
       </div>
-      <input ref={inputRef} type="file" multiple={allowGallery} onChange={(e)=>onFiles(e.target.files)} accept="image/png,image/jpeg,image/jpg,image/gif" hidden />
-  {effectiveMode === 'single' ? (
-        <div className="border rounded p-3 min-h-[120px] flex items-center justify-center bg-gray-50" onDragOver={(e)=>e.preventDefault()} onDrop={onDropArea}>
+      <input ref={inputRef} type="file" multiple={allowGallery} onChange={(e) => onFiles(e.target.files)} accept="image/png,image/jpeg,image/jpg,image/gif" hidden />
+      {effectiveMode === 'single' ? (
+        <div className="border rounded p-3 min-h-[120px] flex items-center justify-center bg-gray-50" onDragOver={(e) => e.preventDefault()} onDrop={onDropArea}>
           {localImages[0] ? (
             <div className="relative">
-      <img src={localImages[0].src} alt={localImages[0].alt} className="max-h-48 object-contain rounded" />
-              <button className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border" onClick={()=>clearAt(0)}>×</button>
+              <img src={localImages[0].src} alt={localImages[0].alt} className="max-h-48 object-contain rounded" />
+              <button className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border" onClick={() => clearAt(0)}>×</button>
             </div>
           ) : (
             <span className="text-gray-400 text-sm">Drop or upload an image</span>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2" onDragOver={(e)=>e.preventDefault()} onDrop={onDropArea}>
-          {[0,1,2].map(i => (
+        <div className="grid grid-cols-3 gap-2" onDragOver={(e) => e.preventDefault()} onDrop={onDropArea}>
+          {[0, 1, 2].map(i => (
             <div key={i} className="relative border rounded p-2 min-h-[100px] flex items-center justify-center bg-gray-50">
-        {localImages[i] ? (
+              {localImages[i] ? (
                 <>
-          <img src={localImages[i].src} alt={localImages[i].alt} className="max-h-32 object-contain rounded" />
-                  <button className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border" onClick={()=>clearAt(i)}>×</button>
+                  <img src={localImages[i].src} alt={localImages[i].alt} className="max-h-32 object-contain rounded" />
+                  <button className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border" onClick={() => clearAt(i)}>×</button>
                 </>
               ) : (
                 <span className="text-gray-300 text-xs">Empty</span>
@@ -325,8 +338,8 @@ export const VideoBlock = ({
 }: {
   url?: string;
   videoSrc?: string;
-  mode?: 'embed'|'upload';
-  onChange?: (data: { url?: string; videoSrc?: string; mode: 'embed'|'upload' }) => void;
+  mode?: 'embed' | 'upload';
+  onChange?: (data: { url?: string; videoSrc?: string; mode: 'embed' | 'upload' }) => void;
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pick = () => inputRef.current?.click();
@@ -341,7 +354,7 @@ export const VideoBlock = ({
       <div className="flex items-center gap-2 mb-2">
         <select
           value={mode}
-          onChange={(e)=> onChange?.({ url, videoSrc, mode: e.target.value as 'embed'|'upload' })}
+          onChange={(e) => onChange?.({ url, videoSrc, mode: e.target.value as 'embed' | 'upload' })}
           className="border rounded px-2 py-1 text-xs"
         >
           <option value="embed">Embed URL</option>
@@ -350,7 +363,7 @@ export const VideoBlock = ({
         {mode === 'embed' ? (
           <input
             value={url || ''}
-            onChange={(e)=> onChange?.({ url: e.target.value, videoSrc, mode: 'embed' })}
+            onChange={(e) => onChange?.({ url: e.target.value, videoSrc, mode: 'embed' })}
             placeholder="https://www.youtube.com/embed/..."
             className="flex-1 border rounded px-2 py-1 text-xs"
           />
@@ -358,7 +371,7 @@ export const VideoBlock = ({
           <button className="px-3 py-1 text-xs border rounded hover:bg-gray-50" onClick={pick}>Choose video</button>
         )}
       </div>
-      <input ref={inputRef} type="file" accept="video/*" hidden onChange={(e)=>onFile(e.target.files)} />
+      <input ref={inputRef} type="file" accept="video/*" hidden onChange={(e) => onFile(e.target.files)} />
       {mode === 'embed' && url ? (
         <div className="aspect-video w-full bg-black/5 rounded flex items-center justify-center">
           <iframe className="w-full h-full rounded" src={url} title="Embedded video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
@@ -376,11 +389,11 @@ export const VideoBlock = ({
   );
 };
 
-export const TableBlock = ({ rows = 3, cols = 3, onChange }: { rows?: number; cols?: number; onChange?: (cells: string[][])=>void }) => {
+export const TableBlock = ({ rows = 3, cols = 3, onChange }: { rows?: number; cols?: number; onChange?: (cells: string[][]) => void }) => {
   const [data, setData] = useState<string[][]>(Array.from({ length: rows }, () => Array.from({ length: cols }, () => '')));
-  const setCell = (r:number,c:number,val:string)=>{
+  const setCell = (r: number, c: number, val: string) => {
     setData(prev => {
-      const next = prev.map((row,ri)=> row.map((cell,ci)=> ri===r && ci===c ? val : cell));
+      const next = prev.map((row, ri) => row.map((cell, ci) => ri === r && ci === c ? val : cell));
       onChange?.(next);
       return next;
     });
@@ -393,7 +406,7 @@ export const TableBlock = ({ rows = 3, cols = 3, onChange }: { rows?: number; co
             <tr key={r}>
               {row.map((cell, c) => (
                 <td key={c} className="border border-gray-300 p-2">
-                  <input value={cell} onChange={(e)=>setCell(r,c,e.target.value)} className="w-full outline-none text-sm" />
+                  <input value={cell} onChange={(e) => setCell(r, c, e.target.value)} className="w-full outline-none text-sm" />
                 </td>
               ))}
             </tr>
@@ -410,198 +423,21 @@ export const DividerBlock = () => (
   </div>
 );
 
-type SpanMark = 'bold'|'italic'|'underline'|'strike'|'link';
-type ParagraphListItem = { spans: { text: string; marks?: SpanMark[]; href?: string }[] };
-
 // Extend props to allow align/list updates from parent
 type ParagraphRichProps = {
-  spans: { text: string; marks?: SpanMark[]; href?: string }[];
-  align?: 'left'|'center'|'right'|'justify';
-  transform?: 'none'|'uppercase'|'lowercase'|'capitalize';
-  list?: 'none'|'ul'|'ol';
+  spans: RichSpan[];
+  align?: Align;
+  transform?: Transform;
+  list?: ListKind;
   items?: ParagraphListItem[];
-  onChange?: (spans: { text: string; marks?: SpanMark[]; href?: string }[]) => void;
+  onChange?: (spans: RichSpan[]) => void;
   onItemsChange?: (items: ParagraphListItem[]) => void;
-  onAlignChange?: (align: 'left'|'center'|'right'|'justify') => void;
-  onListChange?: (list: 'none'|'ul'|'ol') => void;
+  onAlignChange?: (align: Align) => void;
+  onListChange?: (list: ListKind) => void;
+  toolbarVisible?: boolean;
 };
 
-export const ParagraphRich: React.FC<ParagraphRichProps> = ({ spans, items, align='left', transform='none', list='none', onChange, onItemsChange, onAlignChange, onListChange }) => {
-  const [local, setLocal] = useState(spans.length ? spans : [{ text: '' }]);
-  const [localItems, setLocalItems] = useState<ParagraphListItem[]>(items && items.length ? items : [{ spans: [{ text: '' }] }]);
-  const [linkIndex, setLinkIndex] = useState<number|null>(null);
-  const [linkValue, setLinkValue] = useState('');
-  const editorRef = useRef<HTMLDivElement | null>(null);
-  const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const prevListRef = useRef<'none'|'ul'|'ol'>(list);
-  const activeItemRef = useRef<number | null>(null);
-
-  // Keep local spans/items in sync with parent updates
-  useEffect(() => {
-    setLocal(spans.length ? spans : [{ text: '' }]);
-  }, [spans]);
-  useEffect(() => {
-    setLocalItems(items && items.length ? items : [{ spans: [{ text: '' }] }]);
-  }, [items]);
-
-  // When switching into a list or changing list type, focus the last item
-  useEffect(() => {
-    if (list !== 'none' && prevListRef.current !== list) {
-      requestAnimationFrame(() => {
-        const last = itemRefs.current[itemRefs.current.length - 1];
-        if (last) {
-          const range = document.createRange();
-          range.selectNodeContents(last);
-          range.collapse(false);
-          const sel = window.getSelection();
-          sel?.removeAllRanges();
-          sel?.addRange(range);
-        }
-      });
-    }
-    prevListRef.current = list;
-  }, [list, localItems.length]);
-
-  const placeCaretAtEnd = () => {
-    const el = editorRef.current;
-    if (!el) return;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-  };
-
-  const toggleMark = (mark: SpanMark) => {
-    if (list === 'none') {
-      setLocal(prev => {
-        const next = [...prev];
-        const i = next.length - 1;
-        const m = new Set(next[i].marks || []);
-        if (m.has(mark)) m.delete(mark); else m.add(mark);
-        next[i].marks = Array.from(m);
-        if (mark !== 'link') next[i].href = undefined;
-        onChange?.(next);
-        return next;
-      });
-    } else {
-      setLocalItems(prev => {
-        const next = prev.map((it, idx) => idx === prev.length - 1 ? ({
-          spans: it.spans.map((s, si, arr) => si === arr.length - 1 ? ({
-            ...s,
-            marks: Array.from((() => { const m = new Set(s.marks || []); if (m.has(mark)) m.delete(mark); else m.add(mark); return m; })()),
-            href: mark === 'link' ? s.href : undefined,
-          }) : s)
-        }) : it);
-        onItemsChange?.(next);
-        return next;
-      });
-    }
-  };
-
-  const openLink = () => { setLinkIndex(list === 'none' ? local.length - 1 : localItems[localItems.length - 1].spans.length - 1); setLinkValue(''); };
-  const applyLink = () => {
-    if (linkIndex == null) return;
-    if (list === 'none') {
-      setLocal(prev => {
-        const next = [...prev];
-        const m = new Set(next[linkIndex].marks || []);
-        m.add('link');
-        next[linkIndex].marks = Array.from(m);
-        next[linkIndex].href = linkValue;
-        onChange?.(next);
-        return next;
-      });
-    } else {
-      setLocalItems(prev => {
-        const next = prev.map((it, idx) => idx === prev.length - 1 ? ({
-          spans: it.spans.map((s, si, arr) => si === arr.length - 1 ? ({
-            ...s,
-            marks: Array.from((() => { const m = new Set(s.marks || []); m.add('link'); return m; })()),
-            href: linkValue,
-          }) : s)
-        }) : it);
-        onItemsChange?.(next);
-        return next;
-      });
-    }
-    setLinkIndex(null);
-  };
-
-  const onInput = (e: React.FormEvent<HTMLDivElement>) => {
-    // Keep user typing in the current item; no auto-splitting by newlines
-    const raw = e.currentTarget.innerText || '';
-    if (list === 'none') {
-      const lastMarks = local[local.length - 1]?.marks;
-      const lastHref = local[local.length - 1]?.href;
-      const updated = [{ text: raw, marks: lastMarks, href: lastHref }];
-      setLocal(updated);
-      onChange?.(updated);
-    } else {
-      // In list mode, outer container shouldn't be directly edited; ignore
-      e.preventDefault();
-      return;
-    }
-    requestAnimationFrame(() => placeCaretAtEnd());
-  };
-
-  const placeCaretAtEndOf = (el: HTMLElement | null) => {
-    if (!el) return;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-  };
-
-  const onItemInput = (index: number, e: React.FormEvent<HTMLDivElement>) => {
-    const text = (e.currentTarget.textContent || '').replace(/\r/g, '');
-    activeItemRef.current = index;
-    setLocalItems(prev => {
-      const next = prev.length ? [...prev] : [{ spans: [{ text: '' }] }];
-      const lastSpan = next[index]?.spans[next[index].spans.length - 1];
-      const marks = lastSpan?.marks;
-      const href = lastSpan?.href;
-      next[index] = { spans: [{ text, marks, href }] };
-      onItemsChange?.(next);
-      return next;
-    });
-    requestAnimationFrame(() => {
-      const el = itemRefs.current[index] as HTMLElement | null;
-      if (el) placeCaretAtEndOf(el);
-    });
-  };
-
-  const onItemKeyDown = (index: number, e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      // Create a new list item after the current one and focus it.
-      e.preventDefault();
-  setLocalItems(prev => {
-        const next = prev.length ? [...prev] : [{ spans: [{ text: '' }] }];
-        const insertIndex = index + 1;
-        next.splice(insertIndex, 0, { spans: [{ text: '' }] });
-        onItemsChange?.(next);
-        requestAnimationFrame(() => {
-          const target = itemRefs.current[insertIndex];
-          if (target) placeCaretAtEndOf(target);
-        });
-        return next;
-      });
-  activeItemRef.current = index + 1;
-    }
-
-  // Persist caret at end for rapid typing
-  useEffect(() => {
-    if (activeItemRef.current != null) {
-      const el = itemRefs.current[activeItemRef.current];
-      if (el) requestAnimationFrame(() => placeCaretAtEndOf(el));
-    }
-  }, [localItems]);
-    // Shift+Enter falls through to default browser behavior and inserts a newline in the same item.
-  };
-
+const ParagraphRichBase: React.FC<ParagraphRichProps> = ({ spans, items, align = 'left', transform = 'none', list = 'none', onChange, onItemsChange, onAlignChange, onListChange, toolbarVisible = false }) => {
   const style: React.CSSProperties = {
     textAlign: align,
     textTransform: transform === 'uppercase' || transform === 'lowercase' || transform === 'capitalize' ? transform : 'none',
@@ -609,131 +445,43 @@ export const ParagraphRich: React.FC<ParagraphRichProps> = ({ spans, items, alig
     color: 'var(--text-primary)'
   };
 
-  const renderHTML = () => {
-    const wrapSpans = (spansArr: { text: string; marks?: SpanMark[]; href?: string }[]) => {
-      const s = spansArr[spansArr.length - 1] || { text: '' };
-      let el: React.ReactNode = s.text;
-      if (s.marks?.includes('bold')) el = <strong>{el}</strong>;
-      if (s.marks?.includes('italic')) el = <em>{el}</em>;
-      if (s.marks?.includes('underline')) el = <u>{el}</u>;
-      if (s.marks?.includes('strike')) el = <s>{el}</s>;
-      if (s.marks?.includes('link') && s.href) el = <a href={s.href} className="text-blue-600 underline" target="_blank" rel="noreferrer">{el}</a>;
-      return el;
-    };
-  if (list === 'ul') return (
-      <ul className="list-disc pl-6">
-        {localItems.map((it, i) => (
-          <li key={i}>
-            <div
-              ref={(el)=>{ itemRefs.current[i] = el; }}
-              className="whitespace-pre-wrap outline-none"
-              contentEditable
-              suppressContentEditableWarning
-        onMouseDown={(e)=> e.stopPropagation()}
-              onFocus={() => placeCaretAtEndOf(itemRefs.current[i] as HTMLElement)}
-              onClick={() => placeCaretAtEndOf(itemRefs.current[i] as HTMLElement)}
-              onInput={(e)=> onItemInput(i, e)}
-              onKeyDown={(e)=> onItemKeyDown(i, e)}
-            >
-              {wrapSpans(it.spans)}
-            </div>
-          </li>
-        ))}
-      </ul>
-    );
-    if (list === 'ol') return (
-      <ol className="list-decimal pl-6">
-        {localItems.map((it, i) => (
-          <li key={i}>
-            <div
-              ref={(el)=>{ itemRefs.current[i] = el; }}
-              className="whitespace-pre-wrap outline-none"
-              contentEditable
-              suppressContentEditableWarning
-        onMouseDown={(e)=> e.stopPropagation()}
-              onFocus={() => placeCaretAtEndOf(itemRefs.current[i] as HTMLElement)}
-              onClick={() => placeCaretAtEndOf(itemRefs.current[i] as HTMLElement)}
-              onInput={(e)=> onItemInput(i, e)}
-              onKeyDown={(e)=> onItemKeyDown(i, e)}
-            >
-              {wrapSpans(it.spans)}
-            </div>
-          </li>
-        ))}
-      </ol>
-    );
-    return wrapSpans(local);
+  const handleToggleList = (k: ListKind) => {
+    if (!onListChange) return;
+    if (k === list) return;
+    if (k === 'none') {
+      onListChange('none');
+    } else {
+      onListChange(k);
+      if ((!items || items.length === 0) && spans) {
+        onItemsChange?.([{ spans: normalizeSpans(spans) }]);
+      }
+    }
   };
 
-  return (
-  <div className="my-2 group relative">
-      {/* Hover toolbar: hidden by default, appears on hover */}
-      <div className="flex gap-2 items-center opacity-0 group-hover:opacity-100 transition-opacity mb-1">
-        <button className="text-xs border rounded px-2 py-1" title="Bold" onClick={()=>toggleMark('bold')}>B</button>
-        <button className="text-xs border rounded px-2 py-1" title="Italic" onClick={()=>toggleMark('italic')}>I</button>
-        <button className="text-xs border rounded px-2 py-1" title="Underline" onClick={()=>toggleMark('underline')}>U</button>
-        <button className="text-xs border rounded px-2 py-1" title="Strike" onClick={()=>toggleMark('strike')}>S</button>
-        {list === 'none' && (
-          <>
-            <button className="text-xs border rounded px-2 py-1" title="Left" onClick={()=>onAlignChange?.('left')}>⟸</button>
-            <button className="text-xs border rounded px-2 py-1" title="Center" onClick={()=>onAlignChange?.('center')}>≡</button>
-            <button className="text-xs border rounded px-2 py-1" title="Right" onClick={()=>onAlignChange?.('right')}>⟹</button>
-          </>
-        )}
-        <button className="text-xs border rounded px-2 py-1" title="Bulleted list" onClick={()=>onListChange?.(list === 'ul' ? 'none' : 'ul')}>• •</button>
-        <button className="text-xs border rounded px-2 py-1" title="Numbered list" onClick={()=>onListChange?.(list === 'ol' ? 'none' : 'ol')}>1.</button>
-        <button className="text-xs border rounded px-2 py-1" onClick={openLink}>Link</button>
-        {linkIndex!=null && (
-          <span className="ml-2 flex items-center gap-1">
-            <input value={linkValue} onChange={(e)=>setLinkValue(e.target.value)} placeholder="https://" className="border rounded px-2 py-1 text-xs" />
-            <button className="text-xs border rounded px-2 py-1" onClick={applyLink}>Apply</button>
-          </span>
-        )}
-      </div>
-      {list === 'none' ? (
-        <div
-          ref={editorRef}
-          className={`bg-gray-50 rounded-lg px-4 py-3 text-base whitespace-pre-wrap`}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={onInput}
-          onFocus={placeCaretAtEnd}
-          onClick={placeCaretAtEnd}
-          style={style}
-        >
-          {renderHTML()}
-        </div>
-      ) : (
-        <div
-          ref={editorRef}
-          className={`bg-gray-50 rounded-lg px-4 py-3 text-base`}
-          // Container not contentEditable; items are.
-          style={style}
-          onMouseDown={(e) => {
-            // Only focus last item if the click is on the container itself, not on an item.
-            if (e.target !== e.currentTarget) return;
-            const last = itemRefs.current[itemRefs.current.length - 1];
-            if (last) placeCaretAtEndOf(last);
-          }}
-        >
-          {renderHTML()}
-        </div>
-      )}
-      {/* Floating "+ Add item" removed; Enter now creates the next item. */}
-    </div>
+  return list === 'none' ? (
+    <ParagraphEditor
+      value={spans}
+      align={align}
+      style={style}
+  toolbarVisible={toolbarVisible}
+      onChange={(sp) => onChange?.(sp)}
+      onAlign={(a) => onAlignChange?.(a)}
+      onToggleList={(k) => handleToggleList(k)}
+      onOpenLink={() => { /* handled inside editor */ }}
+    />
+  ) : (
+    <ListEditor
+      items={items && items.length ? items : [{ spans: normalizeSpans(spans || [{ text: '' }]) }]}
+      kind={list === 'ul' ? 'ul' : 'ol'}
+      align={align}
+      style={style}
+  toolbarVisible={toolbarVisible}
+      onItemsChange={(it) => onItemsChange?.(it)}
+      onAlign={(a) => onAlignChange?.(a)}
+      onToggleList={(k) => handleToggleList(k)}
+      onOpenLink={() => { /* handled inside editor */ }}
+    />
   );
 };
 
-export default {
-  ToggleHeadingBlock,
-  ParagraphBlock,
-  Blockquote,
-  PullQuote,
-  CodeBlock,
-  PreformattedBlock,
-  ImageUploader,
-  VideoBlock,
-  TableBlock,
-  DividerBlock,
-  ParagraphRich,
-};
+export const ParagraphRich = React.memo(ParagraphRichBase);

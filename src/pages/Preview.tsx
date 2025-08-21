@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ToggleHeadingBlock, ParagraphBlock, Blockquote, PullQuote, CodeBlock, ImageUploader, VideoBlock, TableBlock, DividerBlock } from '@/components/atoms/Blocks';
 import { apiFetch } from '@/lib/api';
+import PureBlocks from '@/components/elements/PureBlocks';
+import { loadDraft } from '@/lib/draftStore';
 
 type Block = { id: string; type: string; data: any };
 
@@ -17,9 +18,48 @@ const Preview: React.FC = () => {
     let cancelled = false;
     setLoading(true);
     setError('');
-    apiFetch(`/api/articles/${id}`, { credentials: 'include' })
-      .then(res => { if (!res.ok) throw new Error('Failed to load article'); return res.json(); })
-      .then((data) => {
+
+    (async () => {
+      // Track whether we populated from session/draft to avoid backend overwrite
+      let usedBlocks = false;
+      let usedTitle = false;
+
+      // 1) Prefer one-shot session draft from the editor (e.g., unsaved changes)
+      const draftRaw = sessionStorage.getItem(`previewDraft:${id}`);
+      if (draftRaw) {
+        try {
+          const draftBlocks = JSON.parse(draftRaw);
+          if (Array.isArray(draftBlocks)) {
+            setBlocks(draftBlocks);
+            usedBlocks = true;
+          }
+        } catch {/* ignore */}
+        // Clear after first use to prevent stale previews
+        try { sessionStorage.removeItem(`previewDraft:${id}`); } catch { /* ignore */ }
+      }
+
+      // 2) If no session blocks or for title, load local draft (IndexedDB+localStorage)
+      if (id) {
+        try {
+          const draft = await loadDraft(id);
+          if (draft) {
+            if (!usedTitle && typeof draft.title === 'string') {
+              setTitle(draft.title);
+              usedTitle = true;
+            }
+            if (!usedBlocks && Array.isArray(draft.blocks)) {
+              setBlocks(draft.blocks as any);
+              usedBlocks = true;
+            }
+          }
+        } catch {/* ignore */}
+      }
+
+      // 3) Backend fallback (only fill fields we didn't already set)
+      try {
+        const res = await apiFetch(`/api/articles/${id}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load article');
+        const data = await res.json();
         if (cancelled) return;
         const obj = (data && typeof data === 'object') ? data as Record<string, any> : {};
         const wrapped = (obj.data && typeof obj.data === 'object') ? obj.data
@@ -28,25 +68,78 @@ const Preview: React.FC = () => {
           : obj;
         const w = wrapped as Record<string, any>;
         const t = w.Title ?? w.title ?? '';
-        setTitle(t);
-        const blocksSource = w.Content?.blocks || w.content?.blocks || [];
-        const normalized = Array.isArray(blocksSource) ? blocksSource.map((block:any) => {
-          if (block.type === 'paragraph') {
-            const content = block.data?.content ?? block.data?.text ?? '';
-            return { id: crypto.randomUUID(), type: 'paragraph', data: { content } };
-          }
-          return { id: crypto.randomUUID(), type: block.type, data: block.data };
-        }) : [];
-        setBlocks(normalized);
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Unknown error'))
-      .finally(() => !cancelled && setLoading(false));
+        if (!usedTitle) setTitle(t);
+        if (!usedBlocks) {
+          const blocksSource = w.Content?.blocks || w.content?.blocks || [];
+          const normalized = Array.isArray(blocksSource) ? blocksSource.map((block:any) => {
+            const t = (block?.type || '').toLowerCase();
+            const d = block?.data || {};
+            // Map various backend shapes into our preview schema
+            if (t === 'header') {
+              return {
+                id: crypto.randomUUID(),
+                type: 'heading',
+                data: { content: d.text || d.content || '', level: d.level || 1, align: d.align }
+              } as Block;
+            }
+            if (t === 'list') {
+              const listKind = (d.style === 'ordered' || d.list === 'ol') ? 'ol' : 'ul';
+              const items = Array.isArray(d.items)
+                ? d.items.map((it: any) => {
+                    if (typeof it === 'string') return { spans: [{ text: String(it) }] };
+                    if (Array.isArray(it?.spans)) return { spans: it.spans };
+                    return { spans: [{ text: String(it?.text || '') }] };
+                  })
+                : [];
+              return { id: crypto.randomUUID(), type: 'paragraph', data: { list: listKind, items, align: d.align } } as Block;
+            }
+            if (t === 'paragraph') {
+              // Ensure spans exist when only plain text provided
+              const out: any = { ...d };
+              if (!Array.isArray(out.spans) && !Array.isArray(out.items)) {
+                const text = typeof out.text === 'string' ? out.text : (typeof out.content === 'string' ? out.content : '');
+                out.spans = [{ text }];
+              }
+              return { id: crypto.randomUUID(), type: 'paragraph', data: out } as Block;
+            }
+            if (t === 'rawhtml' || t === 'raw' || t === 'html') {
+              return { id: crypto.randomUUID(), type: 'rawhtml', data: { html: d.html || d.content || '' } } as Block;
+            }
+            return { id: crypto.randomUUID(), type: block.type, data: d } as Block;
+          }) : [];
+          setBlocks(normalized);
+        }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Unknown error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
     return () => { cancelled = true; };
   }, [id]);
 
+  // Live updates: listen for storage events from editor after Update
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (!id) return;
+      if (e.key === `previewLive:${id}` && typeof e.newValue === 'string') {
+        try {
+          const payload = JSON.parse(e.newValue);
+          if (payload && Array.isArray(payload.blocks)) {
+            setTitle(typeof payload.title === 'string' ? payload.title : title);
+            setBlocks(payload.blocks);
+          }
+        } catch {/* ignore */}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [id, title]);
+
   const articleHeader = useMemo(() => (
-    <header className="mb-8">
-      <h1 className="text-4xl font-bold tracking-tight text-gray-900">{title || 'Untitled'}</h1>
+    <header className="mb-6">
+      <div className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900">{title || 'Untitled'}</div>
     </header>
   ), [title]);
 
@@ -54,54 +147,19 @@ const Preview: React.FC = () => {
   if (error) return <div className="mx-auto max-w-3xl p-6 text-red-600">{error}</div>;
 
   return (
-    <div className="relative mx-auto max-w-3xl p-6">
-      {/* X button to close preview and go back to editor */}
+    <div className="fixed left-1/2 top-6 transform -translate-x-1/2 w-[80vw] max-w-[1600px] pt-6 px-8 pb-6 z-50 bg-white rounded-xl shadow-xl overflow-visible">
+      {/* X button to close preview and go back to editor - positioned outside the card */}
       <button
         onClick={() => navigate(`/artikel/${id}`)}
-        className="absolute top-4 right-4 z-10 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center shadow"
+        className="absolute -top-6 right-4 z-50 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center shadow"
         title="Close preview"
         aria-label="Close preview"
       >
         <span className="text-2xl font-bold">×</span>
       </button>
-      <article className="prose prose-gray">
+          <article className="prose prose-gray mx-auto w-full space-y-6 max-h-[calc(100vh-4rem)] overflow-auto">
         {articleHeader}
-        {blocks.map((block) => {
-          switch (block.type) {
-            case 'heading':
-              return <ToggleHeadingBlock key={block.id} content={block.data.content ?? ''} level={block.data.level ?? 1} />;
-            case 'paragraph':
-              return <ParagraphBlock key={block.id} content={block.data.content ?? ''} />;
-            case 'blockquote':
-              return <Blockquote key={block.id} content={block.data.content ?? ''} />;
-            case 'pullquote':
-              return <PullQuote key={block.id} content={block.data.content ?? ''} />;
-            case 'code':
-              return <CodeBlock key={block.id} code={block.data.code ?? ''} />;
-            case 'image':
-              // ImageUploader in preview: only show images, no upload/interaction
-              return (Array.isArray(block.data.images) && block.data.images.length > 0) ? (
-                <div key={block.id} className="my-3">
-                  {block.data.images.map((img:any, i:number) => (
-                    <img key={i} src={img.src} alt={img.alt || ''} className="max-h-48 object-contain rounded mb-2" />
-                  ))}
-                </div>
-              ) : null;
-            case 'video':
-              // VideoBlock in preview: only show video if src/url, no upload/interaction
-              return block.data.url ? (
-                <div key={block.id} className="my-3">
-                  <iframe className="w-full aspect-video rounded" src={block.data.url} title="Embedded video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                </div>
-              ) : null;
-            case 'table':
-              return <TableBlock key={block.id} rows={block.data.rows} cols={block.data.cols} />;
-            case 'divider':
-              return <DividerBlock key={block.id} />;
-            default:
-              return null;
-          }
-        })}
+        <PureBlocks blocks={blocks} />
       </article>
     </div>
   );
