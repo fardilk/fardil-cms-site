@@ -41,7 +41,7 @@ const Sidebar = () => {
       {/* Profile */}
       <div className="flex items-center mb-8 bg-white rounded-xl shadow justify-center">
         <ImageWithFallback
-          src="/profile.png"
+          src={`${import.meta.env.BASE_URL}profile.png`}
           alt="User"
           icon="fa-user"
           className="h-12 w-12 rounded-full border-2 border-blue-200 object-cover"

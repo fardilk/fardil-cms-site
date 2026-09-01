@@ -17,7 +17,7 @@ const Topbar = ({ onLogout }: { onLogout: () => void }) => (
         <span className="text-2xl">🔔</span>
       </div>
       <ImageWithFallback
-        src="/profile.png"
+        src={`${import.meta.env.BASE_URL}profile.png`}
         alt="User"
         icon="fa-user"
         className="h-10 w-10 rounded-full border-2 border-gray-300 object-cover"
