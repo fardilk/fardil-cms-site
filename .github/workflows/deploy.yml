@@ -1,0 +1,123 @@
+name: Build and Deploy CMS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/fardilk/excellenceplus-cms
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  build-and-deploy:
+    needs: build-check
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Assert required secrets exist
+        shell: bash
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_KEY_B64: ${{ secrets.VPS_KEY_B64 }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -e
+          for n in GHCR_PAT VPS_HOST VPS_USER VPS_KEY_B64 VPS_PORT; do
+            [ -n "${!n}" ] && echo "$n present" || { echo "Missing secret: $n"; exit 1; }
+          done
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        run: echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u fardilk --password-stdin
+
+      - name: Build and Push Docker image
+        run: |
+          set -e
+          TAG_SHA=${GITHUB_SHA::7}
+          docker build -t $IMAGE_NAME:$TAG_SHA -t $IMAGE_NAME:latest .
+          docker push $IMAGE_NAME:$TAG_SHA
+          docker push $IMAGE_NAME:latest
+
+      - name: Prepare SSH key
+        shell: bash
+        env:
+          VPS_KEY_B64: ${{ secrets.VPS_KEY_B64 }}
+        run: |
+          set -e
+          echo "$VPS_KEY_B64" | base64 -d > key.pem
+          chmod 600 key.pem
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          key_path: key.pem
+          script_stop: true
+          script: |
+            set -e
+            IMAGE=ghcr.io/fardilk/excellenceplus-cms:latest
+            NAME=excellenceplus-cms
+            PORT=8083
+
+            docker login ghcr.io -u fardilk -p ${{ secrets.GHCR_PAT }}
+
+            # Pull before touching the running container, so a registry hiccup
+            # cannot leave a stale image redeployed under a green pipeline.
+            pulled=0
+            for i in 1 2 3; do
+              if docker pull "$IMAGE"; then pulled=1; break; fi
+              echo "pull attempt $i failed, retrying in 5s"
+              sleep 5
+            done
+            if [ "$pulled" != 1 ]; then
+              echo "ERROR: could not pull $IMAGE. Leaving the running container untouched."
+              exit 1
+            fi
+
+            docker rm -f "$NAME" || true
+            docker run -d --name "$NAME" \
+              -p "127.0.0.1:$PORT:80" \
+              --restart always \
+              --env-file /etc/excellenceplus/api.env \
+              --add-host host.docker.internal:host-gateway \
+              -v /srv/epweb-media:/data/media \
+              "$IMAGE"
+
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/" || true)
+              if [ "$code" = "200" ]; then
+                break
+              fi
+              sleep 2
+            done
+            if [ "$code" != "200" ]; then
+              echo "ERROR: the panel returned $code"
+              docker logs --tail 50 "$NAME" || true
+              exit 1
+            fi
+            echo "ok /"
+
+            docker image prune -f
