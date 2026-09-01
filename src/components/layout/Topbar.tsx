@@ -1,4 +1,5 @@
 import Button from '../atoms/Button';
+import ImageWithFallback from '../atoms/ImageWithFallback';
 
 const Topbar = ({ onLogout }: { onLogout: () => void }) => (
   <header className="flex items-center justify-between px-8 py-4 bg-white shadow w-full">
@@ -15,7 +16,13 @@ const Topbar = ({ onLogout }: { onLogout: () => void }) => (
         <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1">8</span>
         <span className="text-2xl">🔔</span>
       </div>
-      <img src="/profile.png" alt="User" className="h-10 w-10 rounded-full border-2 border-gray-300" />
+      <ImageWithFallback
+        src="/profile.png"
+        alt="User"
+        icon="fa-user"
+        className="h-10 w-10 rounded-full border-2 border-gray-300 object-cover"
+        iconClassName="text-base"
+      />
       <Button onClick={onLogout}>Logout</Button>
     </div>
   </header>

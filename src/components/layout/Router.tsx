@@ -8,6 +8,9 @@ import ArticlePage from '../../pages/ArticlePage';
 import ArticlePageDetail from '../../pages/ArticlePageDetail';
 import ProtectedRoute from '../func/ProtectedRoute';
 import Preview from '@/pages/Preview';
+import Media from '@/pages/Media';
+import Layanan from '@/pages/Layanan';
+import NotFound from '@/pages/NotFound';
 
 const AppRouter = () => (
   <DndProvider backend={HTML5Backend}>
@@ -53,6 +56,25 @@ const AppRouter = () => (
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/halaman"
+        element={
+          <ProtectedRoute>
+            <Layanan />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/media"
+        element={
+          <ProtectedRoute>
+            <Media />
+          </ProtectedRoute>
+        }
+      />
+      {/* Catch-all: an unmatched path used to render nothing, which is
+          indistinguishable from a crash. */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   </DndProvider>
 );

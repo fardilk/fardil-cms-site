@@ -1,10 +1,11 @@
 import { useLocation, Link } from 'react-router-dom';
 import { FaTachometerAlt, FaFileAlt, FaNewspaper, FaPhotoVideo, FaTags, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { useCollapsibleSidebar } from '../func/collapsible';
+import ImageWithFallback from '../atoms/ImageWithFallback';
 
 const navItems = [
   { label: 'Dashboard', icon: FaTachometerAlt, path: '/dashboard' },
-  { label: 'Halaman', icon: FaFileAlt, path: '/halaman' },
+  { label: 'Layanan', icon: FaFileAlt, path: '/halaman' },
   { label: 'Artikel', icon: FaNewspaper, path: '/artikel' },
   { label: 'Media', icon: FaPhotoVideo, path: '/media' },
 ];
@@ -28,20 +29,23 @@ const Sidebar = () => {
       </button>
       {/* Logo */}
       <div className="mb-8 flex items-center justify-center">
-        <img
-          src="/logo.svg"
-          alt="Logo"
-          className={collapsed ? "h-8 w-8" : "h-8 mr-2 w-auto"}
-          style={collapsed ? { borderRadius: '8px' } : {}}
+        <ImageWithFallback
+          src=""
+          alt="Excellence Plus"
+          icon="fa-cubes"
+          className={collapsed ? "h-8 w-8 rounded-lg" : "h-8 w-8 mr-2 rounded-lg"}
+          iconClassName="text-xl"
         />
+        {!collapsed && <span className="font-semibold text-gray-700">Excellence Plus</span>}
       </div>
       {/* Profile */}
       <div className="flex items-center mb-8 bg-white rounded-xl shadow justify-center">
-        <img
+        <ImageWithFallback
           src="/profile.png"
           alt="User"
-          className="h-12 w-12 aspect-square rounded-full border-2 border-blue-200 object-cover"
-          style={{ minHeight: '3rem', minWidth: '3rem', maxHeight: '3rem', maxWidth: '3rem' }}
+          icon="fa-user"
+          className="h-12 w-12 rounded-full border-2 border-blue-200 object-cover"
+          iconClassName="text-lg"
         />
         {!collapsed && (
           <div className="ml-3 flex flex-col justify-center py-2">

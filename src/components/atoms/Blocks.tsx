@@ -6,6 +6,7 @@ import { normalizeSpans } from './rich/utils';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { ContentImage } from '@/components/func/contentBlocks';
+import ImageWithFallback from './ImageWithFallback';
 
 export const ToggleHeadingBlock = ({
   content,
@@ -303,7 +304,7 @@ export const ImageUploader = ({
         <div className="border rounded p-3 min-h-[120px] flex items-center justify-center bg-gray-50" onDragOver={(e) => e.preventDefault()} onDrop={onDropArea}>
           {localImages[0] ? (
             <div className="relative">
-              <img src={localImages[0].src} alt={localImages[0].alt} className="max-h-48 object-contain rounded" />
+              <ImageWithFallback src={localImages[0].src} alt={localImages[0].alt} className="h-48 w-full object-contain rounded" />
               <button className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border" onClick={() => clearAt(0)}>×</button>
             </div>
           ) : (
@@ -316,7 +317,7 @@ export const ImageUploader = ({
             <div key={i} className="relative border rounded p-2 min-h-[100px] flex items-center justify-center bg-gray-50">
               {localImages[i] ? (
                 <>
-                  <img src={localImages[i].src} alt={localImages[i].alt} className="max-h-32 object-contain rounded" />
+                  <ImageWithFallback src={localImages[i].src} alt={localImages[i].alt} className="h-32 w-full object-contain rounded" />
                   <button className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border" onClick={() => clearAt(i)}>×</button>
                 </>
               ) : (

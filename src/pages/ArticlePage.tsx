@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useArticle } from '../hooks/useArticle';
 import { useNavigate } from 'react-router-dom';
 import { imageURL } from '@/lib/api';
+import ImageWithFallback from '@/components/atoms/ImageWithFallback';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-green-100 text-green-700',
@@ -50,11 +51,11 @@ const ArticlePage = () => {
               </span>
               {/* Image */}
               <div className="w-full aspect-video bg-gray-200 rounded-t-lg overflow-hidden flex items-center justify-center">
-                <img
-                  src={imageURL(article.featuredImage || '/images/default-image.png')}
+                <ImageWithFallback
+                  src={article.featuredImage ? imageURL(article.featuredImage) : ''}
                   alt={article.title}
                   className="object-cover w-full h-full"
-                  style={{ aspectRatio: '16/9' }}
+                  iconClassName="text-4xl"
                 />
               </div>
               <div className="p-4 flex-1 flex flex-col">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { spansToHTML } from '@/components/atoms/rich/utils';
+import ImageWithFallback from '../atoms/ImageWithFallback';
 
 export type PureBlock = { id?: string; type: string; data: any };
 
@@ -55,7 +56,7 @@ export const PureBlocks: React.FC<{ blocks: PureBlock[] } > = ({ blocks }) => {
           return (
             <div key={key} className="my-4 grid gap-3" style={{ gridTemplateColumns: imgs.length > 1 ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr' }}>
               {imgs.map((img: any, i: number) => (
-                <img key={i} src={img?.src} alt={img?.alt || ''} className="w-full h-auto rounded border border-gray-200" />
+                <ImageWithFallback key={i} src={img?.src} alt={img?.alt || ''} className="w-full h-40 rounded border border-gray-200 object-cover" />
               ))}
             </div>
           );

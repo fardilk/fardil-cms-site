@@ -14,6 +14,7 @@ import { useContentBlocks } from '@/components/func/contentBlocks';
 import type { ContentBlock } from '@/components/func/contentBlocks';
 import Seo from '@/elements/Seo';
 import { imageURL, apiFetch } from '@/lib/api';
+import ImageWithFallback from '@/components/atoms/ImageWithFallback';
 import { useDrop, useDragLayer } from 'react-dnd';
 import { BLOCK_TYPE } from '@/components/atoms/DraggableBlock';
 
@@ -972,7 +973,7 @@ const ArticlePageDetail = () => {
                                   return (
                                     <div className="flex gap-2 flex-wrap cursor-default">
                                       {imgs.map((im:any, i:number)=> (
-                                        <img key={i} src={im.src} alt={im.alt||''} className="max-h-48 object-contain rounded border" />
+                                        <ImageWithFallback key={i} src={im.src} alt={im.alt||''} className="h-48 w-full object-contain rounded border" />
                                       ))}
                                     </div>
                                   );
@@ -1028,10 +1029,10 @@ const ArticlePageDetail = () => {
               {article?.featuredImage ? (
                 <div className="border rounded p-3 min-h-[120px] flex items-center justify-center bg-gray-50">
                   <div className="relative">
-                    <img
+                    <ImageWithFallback
                       src={featuredBlobURL || imageURL(article.featuredImage)}
                       alt="Featured"
-                      className="max-h-48 object-contain rounded"
+                      className="h-48 w-full object-contain rounded"
                     />
                     <button
                       className="absolute top-1 right-1 text-xs px-1 rounded bg-white/80 border"
