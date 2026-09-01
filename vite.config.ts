@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
+  // Served behind nginx at https://excellenceplus.id/admin/, not at a root.
+  // Every asset URL and the router basename derive from this.
+  base: '/admin/',
   plugins: [react()],
   resolve: {
     alias: {

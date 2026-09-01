@@ -5,7 +5,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 # Baked in at build time by Vite, so the image is environment-specific.
-ARG VITE_API_BASE_URL=https://api.excellenceplus.id
+ARG VITE_API_BASE_URL=https://excellenceplus.id/admin-api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
