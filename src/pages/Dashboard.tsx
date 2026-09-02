@@ -53,10 +53,12 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'Asia/Jakarta',
 });
 
-/** The programme a lead came from, when the link carried one. */
-const programOf = (path: string): string | null => {
-  const match = /[?&]program=([^&]+)/.exec(path);
-  return match ? decodeURIComponent(match[1]) : null;
+/** What the visitor was doing when they wrote, as carried by the link. */
+const intentOf = (path: string): string | null => {
+  const program = /[?&]program=([^&]+)/.exec(path);
+  if (program) return `Reservasi ${decodeURIComponent(program[1])}`;
+  if (/[?&]type=konsultasi/.test(path)) return 'Permintaan konsultasi';
+  return null;
 };
 
 const Metric: React.FC<{ label: string; value: React.ReactNode; hint?: string }> = ({
@@ -190,18 +192,12 @@ const Dashboard = () => {
                 ) : (
                   <ul className="space-y-2">
                     {byPage.map((p) => {
-                      const program = programOf(p.key);
+                      const intent = intentOf(p.key);
                       return (
                         <li key={p.key}>
                           <div className="flex items-baseline justify-between gap-3 text-[0.8125rem]">
                             <span className="truncate" title={p.key}>
-                              {program ? (
-                                <>
-                                  Pendaftaran <strong>{program}</strong>
-                                </>
-                              ) : (
-                                p.key
-                              )}
+                              {intent ? <strong>{intent}</strong> : p.key}
                             </span>
                             <span className="tabular-nums text-[var(--p-text-secondary)]">
                               {p.count}
