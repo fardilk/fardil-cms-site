@@ -7,20 +7,20 @@ const Login = () => {
   const { handleSubmit, loading } = useLoginHandler();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md md:max-w-lg lg:max-w-xl flex flex-col justify-center items-center space-y-8 py-12 px-4 sm:px-6 lg:px-8 bg-white rounded-lg shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--p-bg)] px-4">
+      <div className="p-card flex w-full max-w-sm flex-col items-center gap-6 px-6 py-8">
         <div className="w-full">
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="text-center text-lg font-semibold text-[var(--p-text)]">
             Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-1 text-center text-[0.8125rem] text-[var(--p-text-secondary)]">
             Enter your credentials to access the dashboard
           </p>
         </div>
-        <form className="w-full mt-8 space-y-6" onSubmit={e => handleSubmit(e, username, password)}>
-          <div className="rounded-md shadow-sm -space-y-px">
+        <form className="w-full space-y-4" onSubmit={e => handleSubmit(e, username, password)}>
+          <div className="space-y-3">
             <div>
-              <label htmlFor="username" className="sr-only">
+              <label htmlFor="username" className="p-label">
                 Username
               </label>
               <input
@@ -28,14 +28,14 @@ const Login = () => {
                 name="username"
                 type="text"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="p-field"
                 placeholder="Username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="p-label">
                 Password
               </label>
               <input
@@ -43,7 +43,7 @@ const Login = () => {
                 name="password"
                 type="password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="p-field"
                 placeholder="Password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
@@ -80,7 +80,7 @@ const Login = () => {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-lg font-bold rounded-md text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-lg hover:from-indigo-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full rounded-lg bg-[#303030] px-3 py-2 text-[0.8125rem] font-medium text-white transition-colors hover:bg-[#1a1a1a] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Sign in
             </button>

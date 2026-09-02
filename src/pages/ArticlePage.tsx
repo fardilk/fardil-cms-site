@@ -4,12 +4,14 @@ import { useArticle } from '../hooks/useArticle';
 import { useNavigate } from 'react-router-dom';
 import { imageURL } from '@/lib/api';
 import ImageWithFallback from '@/components/atoms/ImageWithFallback';
+import PageHeader from '@/components/ui/PageHeader';
+import Card from '@/components/ui/Card';
 
 const statusStyles: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  archived: 'bg-gray-300 text-gray-700',
-  deleted: 'bg-gray-100 text-gray-400',
-  draft: 'bg-orange-100 text-orange-700',
+  active: 'bg-[#cdfee1] text-[#0c5132]',
+  archived: 'bg-[#e3e3e3] text-[#303030]',
+  deleted: 'bg-[#f1f1f1] text-[#8a8a8a]',
+  draft: 'bg-[#ffd6a4] text-[#5e4200]',
 };
 
 const truncate = (str: string, n: number) =>
@@ -31,14 +33,14 @@ const ArticlePage = () => {
   const totalPages = Math.ceil(sortedArticles.length / perPage);
 
   return (
-    <DashboardLayout>
-      <div className="bg-white rounded-xl shadow p-8 w-full min-h-[calc(100vh-96px)]">
-        <h1 className="text-4xl font-bold mb-8">Artikel</h1>
+    <DashboardLayout wide>
+      <PageHeader title="Artikel" subtitle="Tulisan yang tayang di /blog" />
+      <Card>
         {loading && <div className="text-center py-8">Loading...</div>}
         {error && <div className="text-center py-8 text-red-500">{error}</div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           {pagedArticles.map(article => (
-            <div key={article.id} className="bg-gray-50 rounded-lg shadow hover:shadow-lg transition flex flex-col relative">
+            <div key={article.id} className="relative flex flex-col overflow-hidden rounded-lg border border-[var(--p-border)] bg-white transition hover:border-[var(--p-border-strong)]">
               {/* Status label */}
               <span
                 className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-semibold z-10 ${
@@ -75,7 +77,7 @@ const ArticlePage = () => {
                 {Array.isArray(article.tags) && article.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">
                     {article.tags.map((tag: string, idx: number) => (
-                      <span key={idx} className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded">
+                      <span key={idx} className="rounded-lg bg-[#e3e3e3] px-2 py-0.5 text-xs text-[var(--p-text)]">
                         {tag}
                       </span>
                     ))}
@@ -83,7 +85,7 @@ const ArticlePage = () => {
                 )}
                 {/* See Details Button */}
                 <button
-                  className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#303030] px-3 py-1.5 text-[0.8125rem] font-medium text-white hover:bg-[#1a1a1a]"
                   onClick={() => navigate(`/artikel/${article.id}`)}
                 >
                   Lihat
@@ -115,7 +117,7 @@ const ArticlePage = () => {
             </button>
           </div>
         </div>
-      </div>
+      </Card>
     </DashboardLayout>
   );
 };

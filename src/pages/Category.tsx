@@ -102,11 +102,11 @@ const Category: React.FC = () => {
 
   return (
     <GlobalLayout>
-      <div className="bg-white rounded-xl shadow p-8 w-full h-full min-h-[calc(100vh-96px)]">
+      <div className="p-card p-4">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-4xl font-bold">Kategori</h1>
+          <h1 className="text-xl font-semibold text-[var(--p-text)]">Kategori</h1>
           <button
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 cursor-pointer rounded shadow"
+            className="cursor-pointer rounded-lg bg-[#303030] px-3 py-1.5 text-[0.8125rem] font-medium text-white hover:bg-[#1a1a1a]"
             onClick={() => setShowModal(true)}
           >
             + Tambah Kategori
@@ -211,13 +211,13 @@ const Category: React.FC = () => {
             {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
             <div className="flex justify-end gap-2 mt-4">
               <button
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded cursor-pointer"
+                className="cursor-pointer rounded-lg border border-[#cdcdcd] bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-[#303030] hover:bg-[#f7f7f7]"
                 onClick={() => { setShowModal(false); setError(''); setNewCategory(''); setNewSlug(''); setEditId(null); }}
               >
                 Cancel
               </button>
               <button
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded cursor-pointer"
+                className="cursor-pointer rounded-lg bg-[#303030] px-3 py-1.5 text-[0.8125rem] font-medium text-white hover:bg-[#1a1a1a]"
                 onClick={handleAddCategory}
               >
                 {editId ? 'Save' : 'Add'}

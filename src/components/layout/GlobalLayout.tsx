@@ -1,34 +1,31 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import Breadcrumbs from '../atoms/Breadcrumbs';
 import { logout } from '../func/logout';
-import { useNavigate } from 'react-router-dom';
-// Toaster is provided at App level to avoid duplicates
 
 type GlobalLayoutProps = {
   children: React.ReactNode;
+  /** Kept for callers that still pass it; rendered above the content. */
   breadcrumbRight?: React.ReactNode;
+  /** Wide pages (tables, galleries) can opt out of the reading-width cap. */
+  wide?: boolean;
 };
 
-const GlobalLayout: React.FC<GlobalLayoutProps> = ({ children, breadcrumbRight }) => {
+const GlobalLayout: React.FC<GlobalLayoutProps> = ({ children, breadcrumbRight, wide = false }) => {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout(navigate);
-  };
-
   return (
-    <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0">
-        <Topbar onLogout={handleLogout} />
-  <main className="flex-1 w-full p-8 overflow-auto">
-          <div className="flex items-center justify-between mb-4">
-            <Breadcrumbs />
-            <div>{breadcrumbRight}</div>
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--p-bg)]">
+      {/* The bar spans the full width above the navigation, framing the app. */}
+      <Topbar onLogout={() => logout(navigate)} />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar />
+        <main className="min-w-0 flex-1 overflow-auto">
+          <div className={`mx-auto px-6 py-6 ${wide ? 'max-w-[1400px]' : 'max-w-[1000px]'}`}>
+            {breadcrumbRight && <div className="mb-4 flex justify-end">{breadcrumbRight}</div>}
+            {children}
           </div>
-          {children}
         </main>
       </div>
     </div>

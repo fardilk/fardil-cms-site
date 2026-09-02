@@ -1,107 +1,82 @@
 import { useLocation, Link } from 'react-router-dom';
-import { FaTachometerAlt, FaFileAlt, FaNewspaper, FaPhotoVideo, FaTags, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { useCollapsibleSidebar } from '../func/collapsible';
-import ImageWithFallback from '../atoms/ImageWithFallback';
 
-const navItems = [
-  { label: 'Dashboard', icon: FaTachometerAlt, path: '/dashboard' },
-  { label: 'Layanan', icon: FaFileAlt, path: '/halaman' },
-  { label: 'Artikel', icon: FaNewspaper, path: '/artikel' },
-  { label: 'Media', icon: FaPhotoVideo, path: '/media' },
-];
-const masterItems = [
-  { label: 'Kategori', icon: FaTags, path: '/category' },
+type NavItem = { label: string; icon: string; path: string; count?: number };
+
+const generalItems: NavItem[] = [
+  { label: 'Dashboard', icon: 'fa-house', path: '/dashboard' },
+  { label: 'Layanan', icon: 'fa-layer-group', path: '/halaman' },
+  { label: 'Artikel', icon: 'fa-newspaper', path: '/artikel' },
+  { label: 'Media', icon: 'fa-images', path: '/media' },
 ];
 
+const masterItems: NavItem[] = [{ label: 'Kategori', icon: 'fa-tags', path: '/category' }];
+
+/**
+ * Flat navigation on the page background, the way Shopify's is: no card, no
+ * elevation, and an active state that is a soft grey pill rather than a
+ * saturated fill.
+ */
 const Sidebar = () => {
-  const location = useLocation();
-  const activePath = location.pathname;
+  const { pathname } = useLocation();
   const { collapsed, toggleCollapsed } = useCollapsibleSidebar();
 
+  const renderItem = (item: NavItem) => {
+    const active = pathname === item.path || pathname.startsWith(`${item.path}/`);
+    return (
+      <li key={item.path}>
+        <Link
+          to={item.path}
+          title={collapsed ? item.label : undefined}
+          className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[0.8125rem] transition-colors ${
+            active
+              ? 'bg-[var(--p-nav-active)] font-semibold text-[var(--p-text)]'
+              : 'text-[var(--p-text)] hover:bg-[#e7e7e7]'
+          }`}
+        >
+          <i
+            className={`fa ${item.icon} w-4 text-center text-[0.8125rem] ${
+              active ? 'text-[var(--p-text)]' : 'text-[var(--p-text-secondary)]'
+            }`}
+            aria-hidden="true"
+          />
+          {!collapsed && <span className="truncate">{item.label}</span>}
+          {!collapsed && item.count !== undefined && (
+            <span className="ml-auto text-xs text-[var(--p-text-secondary)]">{item.count}</span>
+          )}
+        </Link>
+      </li>
+    );
+  };
+
   return (
-    <aside className={`${collapsed ? "w-20" : "w-64"} bg-[#f5f8ff] text-[#1e293b] flex flex-col min-h-screen px-4 py-6 border-r border-gray-200 transition-all duration-300`}>
-      <button
-        className="mb-4 rounded hover:bg-blue-100 w-8 h-8 flex items-center justify-center"
-        onClick={toggleCollapsed}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        {collapsed ? <FaChevronRight /> : <FaChevronLeft />}
-      </button>
-      {/* Logo */}
-      <div className="mb-8 flex items-center justify-center">
-        <ImageWithFallback
-          src=""
-          alt="Excellence Plus"
-          icon="fa-cubes"
-          className={collapsed ? "h-8 w-8 rounded-lg" : "h-8 w-8 mr-2 rounded-lg"}
-          iconClassName="text-xl"
-        />
-        {!collapsed && <span className="font-semibold text-gray-700">Excellence Plus</span>}
-      </div>
-      {/* Profile */}
-      <div className="flex items-center mb-8 bg-white rounded-xl shadow justify-center">
-        <ImageWithFallback
-          src={`${import.meta.env.BASE_URL}profile.png`}
-          alt="User"
-          icon="fa-user"
-          className="h-12 w-12 rounded-full border-2 border-blue-200 object-cover"
-          iconClassName="text-lg"
-        />
-        {!collapsed && (
-          <div className="ml-3 flex flex-col justify-center py-2">
-            <div className="font-normal text-[#1e293b]">Carlota Monteiro</div>
-            <div className="text-sm text-blue-500">Admin</div>
-          </div>
-        )}
-      </div>
-      {/* Sticky Menu */}
-      <nav className="flex-1 sticky top-0">
-        <div className="mb-4">
-          {!collapsed && <div className="uppercase text-xs text-blue-400 mb-2 tracking-wider">General</div>}
-          <ul>
-            {navItems.map(item => (
-              <li className="mb-2" key={item.path}>
-                <Link
-                  to={item.path}
-                  className={`flex items-center px-3 py-2 rounded-lg transition font-normal relative ${
-                    activePath === item.path
-                      ? 'bg-blue-600 text-white font-semibold'
-                      : 'bg-transparent text-[#1e293b] hover:bg-blue-100 hover:text-blue-500'
-                  }`}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <span className="mr-2 flex justify-center w-6">
-                    {item.icon && <item.icon className={activePath === item.path ? 'text-white' : 'text-blue-400'} />}
-                  </span>
-                  {!collapsed && item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <aside
+      className={`${collapsed ? 'w-16' : 'w-56'} shrink-0 border-r border-[var(--p-border)] bg-[var(--p-bg)] px-3 py-3 transition-all duration-200`}
+    >
+      <nav className="sticky top-3 space-y-5">
+        <ul className="space-y-0.5">{generalItems.map(renderItem)}</ul>
+
         <div>
-          {!collapsed && <div className="uppercase text-xs text-blue-400 mb-2 tracking-wider">Master</div>}
-          <ul>
-            {masterItems.map(item => (
-              <li className="mb-2" key={item.path}>
-                <Link
-                  to={item.path}
-                  className={`flex items-center px-3 py-2 rounded-lg transition font-normal relative ${
-                    activePath === item.path
-                      ? 'bg-blue-600 text-white font-semibold'
-                      : 'bg-transparent text-[#1e293b] hover:bg-blue-100 hover:text-blue-700'
-                  }`}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <span className="mr-2 flex justify-center w-6">
-                    {item.icon && <item.icon className={activePath === item.path ? 'text-white' : 'text-blue-400'} />}
-                  </span>
-                  {!collapsed && item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {!collapsed && (
+            <div className="px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--p-text-disabled)]">
+              Master
+            </div>
+          )}
+          <ul className="space-y-0.5">{masterItems.map(renderItem)}</ul>
         </div>
+
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Lebarkan navigasi' : 'Ciutkan navigasi'}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-[0.8125rem] text-[var(--p-text-secondary)] hover:bg-[#e7e7e7]"
+        >
+          <i
+            className={`fa ${collapsed ? 'fa-chevron-right' : 'fa-chevron-left'} w-4 text-center text-xs`}
+            aria-hidden="true"
+          />
+          {!collapsed && <span>Ciutkan</span>}
+        </button>
       </nav>
     </aside>
   );

@@ -2,6 +2,9 @@ import React from 'react';
 import toast from 'react-hot-toast';
 import GlobalLayout from '../components/layout/GlobalLayout';
 import ImageWithFallback from '../components/atoms/ImageWithFallback';
+import PageHeader from '../components/ui/PageHeader';
+import Card from '../components/ui/Card';
+import Button from '../components/atoms/Button';
 import { apiFetch, imageURL } from '@/lib/api';
 
 type Asset = {
@@ -94,79 +97,77 @@ const Media = () => {
     : 0;
 
   return (
-    <GlobalLayout>
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800">Media</h1>
-            {usage && (
-              <p className="text-sm text-gray-500 mt-1">
-                {usage.file_count} berkas &middot; {formatBytes(usage.used_bytes)}
-                {usage.quota_bytes > 0 && <> dari {formatBytes(usage.quota_bytes)}</>}
-              </p>
-            )}
-          </div>
-          <div>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              multiple
-              className="hidden"
-              onChange={(e) => void upload(e.target.files)}
-            />
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileInput.current?.click()}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              <i className={`fa ${uploading ? 'fa-spinner fa-spin' : 'fa-upload'} mr-2`} aria-hidden="true" />
-              {uploading ? 'Mengunggah…' : 'Unggah gambar'}
-            </button>
-          </div>
-        </div>
+    <GlobalLayout wide>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        multiple
+        className="hidden"
+        onChange={(e) => void upload(e.target.files)}
+      />
+      <PageHeader
+        title="Media"
+        subtitle={
+          usage
+            ? `${usage.file_count} berkas · ${formatBytes(usage.used_bytes)}${usage.quota_bytes > 0 ? ` dari ${formatBytes(usage.quota_bytes)}` : ''}`
+            : undefined
+        }
+        actions={
+          <Button
+            variant="primary"
+            disabled={uploading}
+            icon={uploading ? 'fa-spinner fa-spin' : 'fa-upload'}
+            onClick={() => fileInput.current?.click()}
+          >
+            {uploading ? 'Mengunggah…' : 'Unggah gambar'}
+          </Button>
+        }
+      />
+      <Card>
 
         {usage && usage.quota_bytes > 0 && (
-          <div className="mb-6">
-            <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+          <div className="mb-5">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#e3e3e3]">
               <div
-                className={`h-full ${pct > 90 ? 'bg-red-500' : 'bg-blue-500'}`}
+                className={`h-full ${pct > 90 ? 'bg-[#c62828]' : 'bg-[#303030]'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">{pct}% terpakai</p>
+            <p className="mt-1 text-xs text-[var(--p-text-secondary)]">{pct}% terpakai</p>
           </div>
         )}
 
         {loading ? (
-          <p className="text-gray-500 py-12 text-center">Memuat…</p>
+          <p className="py-12 text-center text-[0.8125rem] text-[var(--p-text-secondary)]">Memuat…</p>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <i className="fa fa-images text-5xl text-gray-300 mb-4" aria-hidden="true" />
-            <p className="text-gray-600 font-medium">Belum ada gambar</p>
-            <p className="text-gray-400 text-sm">Unggah gambar untuk dipakai di artikel dan halaman layanan.</p>
+            <i className="fa fa-images mb-4 text-4xl text-[var(--p-text-disabled)]" aria-hidden="true" />
+            <p className="font-medium text-[var(--p-text)]">Belum ada gambar</p>
+            <p className="text-[0.8125rem] text-[var(--p-text-secondary)]">
+              Unggah gambar untuk dipakai di artikel dan halaman layanan.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {items.map((item) => (
-              <div key={item.asset.id} className="border border-gray-200 rounded-lg overflow-hidden group">
+              <div key={item.asset.id} className="overflow-hidden rounded-lg border border-[var(--p-border)]">
                 <ImageWithFallback
                   src={imageURL(item.url)}
                   alt={item.asset.original_name}
-                  className="w-full h-28 object-cover bg-gray-50"
+                  className="h-28 w-full bg-[#fafafa] object-cover"
                 />
                 <div className="p-2">
-                  <p className="text-xs text-gray-700 truncate" title={item.asset.original_name}>
+                  <p className="truncate text-xs text-[var(--p-text)]" title={item.asset.original_name}>
                     {item.asset.original_name}
                   </p>
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11px] text-[var(--p-text-secondary)]">
                     {item.asset.width}×{item.asset.height} &middot; {formatBytes(item.asset.size_bytes)}
                   </p>
                   <button
                     type="button"
                     onClick={() => void remove(item)}
-                    className="mt-2 text-[11px] text-red-600 hover:underline"
+                    className="mt-2 text-[11px] text-[var(--p-critical)] hover:underline"
                   >
                     <i className="fa fa-trash mr-1" aria-hidden="true" />
                     Hapus
@@ -176,7 +177,7 @@ const Media = () => {
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </GlobalLayout>
   );
 };

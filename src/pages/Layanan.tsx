@@ -1,6 +1,9 @@
 import React from 'react';
 import toast from 'react-hot-toast';
 import GlobalLayout from '../components/layout/GlobalLayout';
+import PageHeader from '../components/ui/PageHeader';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
 import { apiFetch } from '@/lib/api';
 
 type Service = {
@@ -20,10 +23,10 @@ const templateLabel: Record<string, string> = {
   retainer: 'Layanan berkelanjutan',
 };
 
-const templateStyle: Record<string, string> = {
-  program: 'bg-blue-50 text-blue-700',
-  engagement: 'bg-purple-50 text-purple-700',
-  retainer: 'bg-amber-50 text-amber-700',
+const templateTone: Record<string, 'info' | 'neutral' | 'warning'> = {
+  program: 'info',
+  engagement: 'neutral',
+  retainer: 'warning',
 };
 
 const Layanan = () => {
@@ -56,23 +59,19 @@ const Layanan = () => {
 
   return (
     <GlobalLayout>
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800">Halaman Layanan</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Isi halaman di bawah /services pada situs publik.
-            </p>
-          </div>
-        </div>
+      <PageHeader
+        title="Halaman Layanan"
+        subtitle="Isi halaman di bawah /services pada situs publik."
+      />
+      <Card>
 
         {loading ? (
-          <p className="text-gray-500 py-12 text-center">Memuat…</p>
+          <p className="py-12 text-center text-[0.8125rem] text-[var(--p-text-secondary)]">Memuat…</p>
         ) : services.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <i className="fa fa-layer-group text-5xl text-gray-300 mb-4" aria-hidden="true" />
-            <p className="text-gray-600 font-medium">Belum ada halaman layanan</p>
-            <p className="text-gray-400 text-sm max-w-md">
+            <i className="fa fa-layer-group mb-4 text-4xl text-[var(--p-text-disabled)]" aria-hidden="true" />
+            <p className="font-medium text-[var(--p-text)]">Belum ada halaman layanan</p>
+            <p className="max-w-md text-[0.8125rem] text-[var(--p-text-secondary)]">
               Formulir untuk ketiga template layanan sedang disiapkan. Halaman yang sudah
               dibuat akan muncul di sini, dikelompokkan per kategori.
             </p>
@@ -81,28 +80,28 @@ const Layanan = () => {
           <div className="space-y-8">
             {Object.entries(byCategory).map(([category, list]) => (
               <section key={category}>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                <h2 className="mb-2 text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--p-text-disabled)]">
                   {category}
                 </h2>
                 <div className="grid gap-3">
                   {list.map((s) => (
                     <div
                       key={s.id}
-                      className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3"
+                      className="flex items-center justify-between rounded-lg border border-[var(--p-border)] px-4 py-3"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-800 truncate">{s.title}</span>
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full ${templateStyle[s.template] ?? 'bg-gray-100 text-gray-600'}`}>
+                          <span className="truncate font-medium text-[var(--p-text)]">{s.title}</span>
+                          <Badge tone={templateTone[s.template] ?? 'neutral'}>
                             {templateLabel[s.template] ?? s.template}
-                          </span>
-                          {!s.published && (
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                              Draft
-                            </span>
+                          </Badge>
+                          {s.published ? (
+                            <Badge tone="success" dot>Tayang</Badge>
+                          ) : (
+                            <Badge dot>Draft</Badge>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="truncate text-xs text-[var(--p-text-secondary)]">
                           /services/{s.category}/{s.slug}
                         </p>
                       </div>
@@ -113,7 +112,7 @@ const Layanan = () => {
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </GlobalLayout>
   );
 };
