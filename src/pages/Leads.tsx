@@ -113,7 +113,7 @@ const Leads = () => {
       />
 
       <Card flush>
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--p-border)] px-4 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--p-border)] px-4 py-2.5">
           <button
             type="button"
             onClick={() => setFilter('')}

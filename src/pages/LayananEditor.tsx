@@ -118,6 +118,19 @@ const validate = (s: Service): string | null => {
 const withPositions = <T extends Row>(rows: T[]): T[] =>
   rows.map((row, i) => ({ ...row, position: i }));
 
+/** Shared by the Save button and by autosave, so the two cannot drift apart. */
+const buildPayload = (s: Service): Service => ({
+  ...s,
+  highlights: withPositions(s.highlights),
+  steps: withPositions(s.steps),
+  outcomes: withPositions(s.outcomes),
+  metrics: withPositions(s.metrics),
+  faqs: withPositions(s.faqs),
+  plans: withPositions(s.plans),
+  proofs: withPositions(s.proofs),
+  schedules: withPositions(s.schedules),
+});
+
 // <input type="datetime-local"> wants 'YYYY-MM-DDTHH:mm'; the API speaks RFC 3339.
 const toLocalInput = (iso: string | null) => (iso ? iso.slice(0, 16) : '');
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
@@ -133,8 +146,20 @@ const LayananEditor = () => {
   // A slug that was already published must not silently move and 404 the old URL.
   const [slugTouched, setSlugTouched] = React.useState(!isNew);
 
+  // Snapshot of the last saved state. Anything different from it is unsaved
+  // work, which is what autosave and the close warning key off.
+  const baseline = React.useRef<string>('');
+  const latest = React.useRef<{ service: Service; id?: string; dirty: boolean }>({
+    service: emptyService(),
+    id,
+    dirty: false,
+  });
+
   React.useEffect(() => {
-    if (isNew) return;
+    if (isNew) {
+      baseline.current = JSON.stringify(emptyService());
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -142,7 +167,7 @@ const LayananEditor = () => {
         if (!res.ok) throw new Error('failed');
         const data = await res.json();
         if (cancelled) return;
-        setService({
+        const loaded: Service = {
           ...emptyService(),
           ...data,
           highlights: data.highlights ?? [],
@@ -156,7 +181,9 @@ const LayananEditor = () => {
           })),
           proofs: data.proofs ?? [],
           schedules: data.schedules ?? [],
-        });
+        };
+        setService(loaded);
+        baseline.current = JSON.stringify(loaded);
       } catch {
         if (!cancelled) toast.error('Gagal memuat layanan');
       } finally {
@@ -167,6 +194,51 @@ const LayananEditor = () => {
       cancelled = true;
     };
   }, [id, isNew]);
+
+  const dirty = baseline.current !== '' && JSON.stringify(service) !== baseline.current;
+
+  React.useEffect(() => {
+    latest.current = { service, id, dirty };
+  }, [service, id, dirty]);
+
+  // Closing the tab cannot be intercepted with a save, so warn instead.
+  React.useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!latest.current.dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
+  // Navigating away inside the panel saves rather than discards.
+  //
+  // `published` is never altered here: a new page was created as a draft and
+  // stays one, and an existing page keeps whatever state its author chose. An
+  // autosave must never be the thing that publishes something.
+  React.useEffect(
+    () => () => {
+      const { service: current, id: currentId, dirty: isDirty } = latest.current;
+      if (!isDirty || validate(current)) return;
+      const creating = !currentId || currentId === 'baru';
+      apiFetch(creating ? '/api/services' : `/api/services/${currentId}`, {
+        method: creating ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(buildPayload(current)),
+      })
+        .then((res) => {
+          if (res.ok) {
+            toast.success(
+              current.published ? 'Perubahan tersimpan' : 'Tersimpan sebagai draft',
+            );
+          }
+        })
+        .catch(() => undefined);
+    },
+    [],
+  );
 
   const set = <K extends keyof Service>(key: K, value: Service[K]) =>
     setService((prev) => ({ ...prev, [key]: value }));
@@ -200,23 +272,11 @@ const LayananEditor = () => {
 
     setSaving(true);
     try {
-      const payload: Service = {
-        ...service,
-        highlights: withPositions(service.highlights),
-        steps: withPositions(service.steps),
-        outcomes: withPositions(service.outcomes),
-        metrics: withPositions(service.metrics),
-        faqs: withPositions(service.faqs),
-        plans: withPositions(service.plans),
-        proofs: withPositions(service.proofs),
-        schedules: withPositions(service.schedules),
-      };
-
       const res = await apiFetch(isNew ? '/api/services' : `/api/services/${id}`, {
         method: isNew ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildPayload(service)),
       });
 
       if (!res.ok) {
@@ -226,6 +286,7 @@ const LayananEditor = () => {
       }
 
       const saved = await res.json();
+      baseline.current = JSON.stringify(service);
       toast.success('Tersimpan');
       if (isNew) navigate(`/halaman/${saved.id}`, { replace: true });
       else setService((prev) => ({ ...prev, ...saved }));
@@ -493,9 +554,19 @@ const LayananEditor = () => {
         }
         subtitle={service.slug ? `/services/${service.category}/${service.slug}` : def.audience}
         actions={
-          <Button variant="primary" onClick={() => void save()} disabled={saving} icon={saving ? 'fa-spinner fa-spin' : undefined}>
-            {saving ? 'Menyimpan…' : 'Simpan'}
-          </Button>
+          <>
+            {dirty && (
+              <span className="text-xs text-[var(--p-text-secondary)]">Belum tersimpan</span>
+            )}
+            <Button
+              variant="primary"
+              onClick={() => void save()}
+              disabled={saving}
+              icon={saving ? 'fa-spinner fa-spin' : undefined}
+            >
+              {saving ? 'Menyimpan…' : 'Simpan'}
+            </Button>
+          </>
         }
       />
 
