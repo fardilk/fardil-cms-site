@@ -9,6 +9,7 @@ import ArticlePageDetail from '../../pages/ArticlePageDetail';
 import ProtectedRoute from '../func/ProtectedRoute';
 import Preview from '@/pages/Preview';
 import Media from '@/pages/Media';
+import Leads from '@/pages/Leads';
 import Layanan from '@/pages/Layanan';
 import NotFound from '@/pages/NotFound';
 
@@ -69,6 +70,14 @@ const AppRouter = () => (
         element={
           <ProtectedRoute>
             <Media />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pesan"
+        element={
+          <ProtectedRoute>
+            <Leads />
           </ProtectedRoute>
         }
       />

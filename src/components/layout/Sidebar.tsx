@@ -1,10 +1,13 @@
 import { useLocation, Link } from 'react-router-dom';
+import React from 'react';
 import { useCollapsibleSidebar } from '../func/collapsible';
+import { apiFetch } from '@/lib/api';
 
 type NavItem = { label: string; icon: string; path: string; count?: number };
 
 const generalItems: NavItem[] = [
   { label: 'Dashboard', icon: 'fa-house', path: '/dashboard' },
+  { label: 'Pesan Masuk', icon: 'fa-inbox', path: '/pesan' },
   { label: 'Layanan', icon: 'fa-layer-group', path: '/halaman' },
   { label: 'Artikel', icon: 'fa-newspaper', path: '/artikel' },
   { label: 'Media', icon: 'fa-images', path: '/media' },
@@ -20,6 +23,25 @@ const masterItems: NavItem[] = [{ label: 'Kategori', icon: 'fa-tags', path: '/ca
 const Sidebar = () => {
   const { pathname } = useLocation();
   const { collapsed, toggleCollapsed } = useCollapsibleSidebar();
+
+  // Unread enquiries, shown the way Shopify counts orders. The list endpoint
+  // returns the count, so this costs no extra request beyond the first.
+  const [newLeads, setNewLeads] = React.useState<number | undefined>(undefined);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/leads?limit=1', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.new_count === 'number') {
+          setNewLeads(data.new_count || undefined);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   const renderItem = (item: NavItem) => {
     const active = pathname === item.path || pathname.startsWith(`${item.path}/`);
@@ -49,12 +71,16 @@ const Sidebar = () => {
     );
   };
 
+  const items = generalItems.map((item) =>
+    item.path === '/pesan' ? { ...item, count: newLeads } : item,
+  );
+
   return (
     <aside
       className={`${collapsed ? 'w-16' : 'w-56'} shrink-0 border-r border-[var(--p-border)] bg-[var(--p-bg)] px-3 py-3 transition-all duration-200`}
     >
       <nav className="sticky top-3 space-y-5">
-        <ul className="space-y-0.5">{generalItems.map(renderItem)}</ul>
+        <ul className="space-y-0.5">{items.map(renderItem)}</ul>
 
         <div>
           {!collapsed && (
