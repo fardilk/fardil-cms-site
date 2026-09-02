@@ -94,7 +94,7 @@ export const TEMPLATES: TemplateDef[] = [
     value: 'engagement',
     label: 'Engagement',
     audience: 'Consultancy — proyek dengan scope, ditawarkan bukan diberi harga tetap.',
-    groups: ['highlights', 'steps', 'outcomes', 'proofs', 'plans', 'metrics', 'faqs'],
+    groups: ['highlights', 'steps', 'outcomes', 'schedules', 'plans', 'proofs', 'metrics', 'faqs'],
     copy: {
       ...shared,
       highlights: {
@@ -114,10 +114,15 @@ export const TEMPLATES: TemplateDef[] = [
         help: 'Barang nyata yang klien terima: SOP, matriks kompetensi, dashboard.',
         addLabel: 'Tambah deliverable',
       },
+      schedules: {
+        title: 'Jadwal Sesi',
+        help: 'Tanggal yang sudah dibuka. Untuk coaching, ini jadwal sesi; kosongkan bila seluruhnya by appointment.',
+        addLabel: 'Tambah jadwal',
+      },
       plans: {
-        title: 'Model Kerja Sama',
-        help: 'Audit singkat, proyek penuh, atau retainer pendampingan.',
-        addLabel: 'Tambah model',
+        title: 'Paket & Investasi',
+        help: 'Audit singkat, proyek penuh, retainer, atau paket sesi coaching.',
+        addLabel: 'Tambah paket',
       },
     },
   },
@@ -161,7 +166,7 @@ export const templateDef = (value: string): TemplateDef =>
 export const CATEGORIES = [
   { slug: 'training', label: 'Training', template: 'program' },
   { slug: 'consultancy', label: 'Consultancy', template: 'engagement' },
-  { slug: 'coaching', label: 'Coaching', template: 'program' },
+  { slug: 'coaching', label: 'Coaching', template: 'engagement' },
   { slug: 'executive-search', label: 'Executive Search & Recruitment', template: 'retainer' },
   { slug: 'employer-of-record', label: 'Employer of Record (EOR)', template: 'retainer' },
 ];
