@@ -56,7 +56,7 @@ const ActionMenu: React.FC<{ actions: MenuAction[]; label?: string }> = ({
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--p-border)] bg-white text-[var(--p-text-secondary)] hover:bg-[var(--p-surface-hover)]"
+        className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--p-border)] bg-white text-[var(--p-text-secondary)] shadow-sm hover:bg-[var(--p-surface-hover)]"
       >
         <i className="fa fa-ellipsis text-xs" aria-hidden="true" />
       </button>

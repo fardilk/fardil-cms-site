@@ -204,28 +204,31 @@ const ArticlePage = () => {
               {paged.map((a) => (
                 <div
                   key={a.id}
-                  className="flex flex-col overflow-hidden rounded-lg border border-[var(--p-border)] bg-white transition hover:border-[var(--p-border-strong)]"
+                  className="relative flex flex-col rounded-lg border border-[var(--p-border)] bg-white transition hover:border-[var(--p-border-strong)]"
                 >
+                  {/* Sits over the cover, where an overflow control is expected,
+                      rather than buried in the text below it. */}
+                  <div className="absolute right-2 top-2 z-10">
+                    <ActionMenu actions={actionsFor(a)} />
+                  </div>
+
                   {/* The card itself opens the editor, so nothing competes with it. */}
                   <Link to={`/artikel/${a.id}`} className="block">
                     <ImageWithFallback
                       src={a.featured_image ? imageURL(a.featured_image) : ''}
                       alt={a.alt_text || a.title}
-                      className="aspect-video w-full bg-[#fafafa] object-cover"
+                      className="aspect-video w-full rounded-t-lg bg-[#fafafa] object-cover"
                       iconClassName="text-3xl"
                     />
                   </Link>
                   <div className="flex flex-1 flex-col p-3">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {statusBadge(a)}
-                        {a.categories?.map((c) => (
-                          <span key={c.id} className="text-xs text-[var(--p-text-secondary)]">
-                            {c.name}
-                          </span>
-                        ))}
-                      </div>
-                      <ActionMenu actions={actionsFor(a)} />
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                      {statusBadge(a)}
+                      {a.categories?.map((c) => (
+                        <span key={c.id} className="text-xs text-[var(--p-text-secondary)]">
+                          {c.name}
+                        </span>
+                      ))}
                     </div>
                     <Link to={`/artikel/${a.id}`} className="min-w-0 flex-1">
                       <h2 className="font-medium text-[var(--p-text)]">{a.title}</h2>
