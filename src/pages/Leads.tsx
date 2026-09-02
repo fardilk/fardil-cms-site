@@ -15,6 +15,13 @@ type Lead = {
   company: string;
   message: string;
   source_path: string;
+  kind: string;
+  company_address: string;
+  division: string;
+  position: string;
+  city: string;
+  certificate_address: string;
+  referral_source: string;
   status: string;
   note: string;
   created_at: string;
@@ -31,6 +38,16 @@ const STATUSES: Array<{ value: string; label: string; tone: Tone }> = [
 
 const statusMeta = (value: string) =>
   STATUSES.find((s) => s.value === value) ?? { value, label: value, tone: 'neutral' as Tone };
+
+/** Fields the registration form collects, in the order it asks for them. */
+const REGISTRATION_FIELDS: Array<[keyof Lead, string]> = [
+  ['company_address', 'Alamat perusahaan'],
+  ['division', 'Divisi'],
+  ['position', 'Jabatan'],
+  ['city', 'Kota domisili'],
+  ['certificate_address', 'Kirim sertifikat'],
+  ['referral_source', 'Info dari'],
+];
 
 const dateFormat = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
@@ -164,12 +181,18 @@ const Leads = () => {
                         <Badge tone={meta.tone} dot={lead.status === 'new'}>
                           {meta.label}
                         </Badge>
+                        {lead.kind === 'registration' && (
+                          <Badge tone="success">Pendaftaran</Badge>
+                        )}
                         {lead.company && (
                           <span className="text-xs text-[var(--p-text-secondary)]">{lead.company}</span>
                         )}
                       </div>
                       <p className="mt-0.5 truncate text-[0.8125rem] text-[var(--p-text-secondary)]">
-                        {lead.message}
+                        {lead.message ||
+                          (lead.kind === 'registration'
+                            ? [lead.position, lead.city].filter(Boolean).join(' · ')
+                            : '')}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs text-[var(--p-text-secondary)]">
@@ -212,10 +235,24 @@ const Leads = () => {
                           </div>
                         </dl>
 
-                        <div className="lg:col-span-2">
-                          <p className="whitespace-pre-wrap rounded-lg border border-[var(--p-border)] bg-white p-3 text-[0.8125rem]">
-                            {lead.message}
-                          </p>
+                        <div className="space-y-3 lg:col-span-2">
+                          {lead.kind === 'registration' && (
+                            <dl className="grid gap-1.5 rounded-lg border border-[var(--p-border)] bg-white p-3 text-[0.8125rem] sm:grid-cols-2">
+                              {REGISTRATION_FIELDS.map(([field, label]) => (
+                                <div key={field} className="flex gap-2">
+                                  <dt className="w-32 shrink-0 text-[var(--p-text-secondary)]">
+                                    {label}
+                                  </dt>
+                                  <dd className="min-w-0">{String(lead[field] || '-')}</dd>
+                                </div>
+                              ))}
+                            </dl>
+                          )}
+                          {lead.message && (
+                            <p className="whitespace-pre-wrap rounded-lg border border-[var(--p-border)] bg-white p-3 text-[0.8125rem]">
+                              {lead.message}
+                            </p>
+                          )}
                         </div>
                       </div>
 
