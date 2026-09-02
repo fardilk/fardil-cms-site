@@ -8,6 +8,7 @@ import ProtectedRoute from '../func/ProtectedRoute';
 import Preview from '@/pages/Preview';
 import Media from '@/pages/Media';
 import Leads from '@/pages/Leads';
+import Registrations from '@/pages/Registrations';
 import Layanan from '@/pages/Layanan';
 import LayananEditor from '@/pages/LayananEditor';
 import NotFound from '@/pages/NotFound';
@@ -93,6 +94,22 @@ const AppRouter = () => (
         element={
           <ProtectedRoute>
             <Leads />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/transaksi/permintaan"
+        element={
+          <ProtectedRoute>
+            <Registrations stage="permintaan" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/transaksi/peserta"
+        element={
+          <ProtectedRoute>
+            <Registrations stage="peserta" />
           </ProtectedRoute>
         }
       />

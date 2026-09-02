@@ -13,6 +13,11 @@ const generalItems: NavItem[] = [
   { label: 'Media', icon: 'fa-images', path: '/media' },
 ];
 
+const transactionItems: NavItem[] = [
+  { label: 'Permintaan', icon: 'fa-clipboard-list', path: '/transaksi/permintaan' },
+  { label: 'Peserta', icon: 'fa-user-check', path: '/transaksi/peserta' },
+];
+
 const masterItems: NavItem[] = [{ label: 'Kategori', icon: 'fa-tags', path: '/category' }];
 
 /**
@@ -28,9 +33,13 @@ const Sidebar = () => {
   // returns the count, so this costs no extra request beyond the first.
   const [newLeads, setNewLeads] = React.useState<number | undefined>(undefined);
 
+  // Registrations waiting on payment, counted the same way.
+  const [pending, setPending] = React.useState<number | undefined>(undefined);
+
   React.useEffect(() => {
     let cancelled = false;
-    apiFetch('/api/leads?limit=1', { credentials: 'include' })
+
+    apiFetch('/api/leads?kind=enquiry&limit=1', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && data && typeof data.new_count === 'number') {
@@ -38,6 +47,16 @@ const Sidebar = () => {
         }
       })
       .catch(() => undefined);
+
+    apiFetch('/api/leads?stage=permintaan&limit=1', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.total === 'number') {
+          setPending(data.total || undefined);
+        }
+      })
+      .catch(() => undefined);
+
     return () => {
       cancelled = true;
     };
@@ -81,6 +100,21 @@ const Sidebar = () => {
     >
       <nav className="sticky top-3 space-y-5">
         <ul className="space-y-0.5">{items.map(renderItem)}</ul>
+
+        <div>
+          {!collapsed && (
+            <div className="px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-wide text-[var(--p-text-disabled)]">
+              Transaksi
+            </div>
+          )}
+          <ul className="space-y-0.5">
+            {transactionItems
+              .map((item) =>
+                item.path === '/transaksi/permintaan' ? { ...item, count: pending } : item,
+              )
+              .map(renderItem)}
+          </ul>
+        </div>
 
         <div>
           {!collapsed && (

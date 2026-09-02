@@ -77,7 +77,8 @@ const Leads = () => {
   const load = React.useCallback(async (status: string) => {
     setLoading(true);
     try {
-      const query = status ? `?status=${encodeURIComponent(status)}` : '';
+      // Registrations live under Transaksi; this list is enquiries only.
+      const query = `?kind=enquiry${status ? `&status=${encodeURIComponent(status)}` : ''}`;
       const res = await apiFetch(`/api/leads${query}`, { credentials: 'include' });
       if (!res.ok) throw new Error('failed');
       const data = await res.json();
@@ -121,7 +122,7 @@ const Leads = () => {
       <PageHeader
         title="Pesan Masuk"
         badges={newCount > 0 ? <Badge tone="info" dot>{newCount} baru</Badge> : undefined}
-        subtitle={`${total} pesan dari formulir kontak di situs`}
+        subtitle={`${total} pesan dari formulir kontak di situs. Pendaftaran program ada di Transaksi.`}
         actions={
           <Button icon="fa-rotate" onClick={() => void load(filter)}>
             Muat ulang

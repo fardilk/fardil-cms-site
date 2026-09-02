@@ -18,6 +18,10 @@ type Stats = {
     by_day: CountPair[];
     by_page: CountPair[];
   };
+  registrations: {
+    pending: number;
+    enrolled: number;
+  };
   content: {
     articles_published: number;
     articles_draft: number;
@@ -157,6 +161,16 @@ const Dashboard = () => {
               label="Belum ditangani"
               value={stats.leads.new}
               hint={`dari ${stats.leads.total} total`}
+            />
+            <Metric
+              label="Permintaan pendaftaran"
+              value={stats.registrations.pending}
+              hint="menunggu konfirmasi bayar"
+            />
+            <Metric
+              label="Peserta terjadwal"
+              value={stats.registrations.enrolled}
+              hint="sudah bayar dan masuk batch"
             />
             <Metric
               label="Halaman layanan tayang"
