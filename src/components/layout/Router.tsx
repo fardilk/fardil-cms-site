@@ -11,6 +11,7 @@ import Preview from '@/pages/Preview';
 import Media from '@/pages/Media';
 import Leads from '@/pages/Leads';
 import Layanan from '@/pages/Layanan';
+import LayananEditor from '@/pages/LayananEditor';
 import NotFound from '@/pages/NotFound';
 
 const AppRouter = () => (
@@ -62,6 +63,14 @@ const AppRouter = () => (
         element={
           <ProtectedRoute>
             <Layanan />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/halaman/:id"
+        element={
+          <ProtectedRoute>
+            <LayananEditor />
           </ProtectedRoute>
         }
       />

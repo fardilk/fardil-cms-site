@@ -1,9 +1,11 @@
 import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import GlobalLayout from '../components/layout/GlobalLayout';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import Button from '../components/atoms/Button';
 import { apiFetch } from '@/lib/api';
 
 type Service = {
@@ -30,6 +32,7 @@ const templateTone: Record<string, 'info' | 'neutral' | 'warning'> = {
 };
 
 const Layanan = () => {
+  const navigate = useNavigate();
   const [services, setServices] = React.useState<Service[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -62,6 +65,11 @@ const Layanan = () => {
       <PageHeader
         title="Halaman Layanan"
         subtitle="Isi halaman di bawah /services pada situs publik."
+        actions={
+          <Button variant="primary" icon="fa-plus" onClick={() => navigate('/halaman/baru')}>
+            Tambah layanan
+          </Button>
+        }
       />
       <Card>
 
@@ -72,8 +80,7 @@ const Layanan = () => {
             <i className="fa fa-layer-group mb-4 text-4xl text-[var(--p-text-disabled)]" aria-hidden="true" />
             <p className="font-medium text-[var(--p-text)]">Belum ada halaman layanan</p>
             <p className="max-w-md text-[0.8125rem] text-[var(--p-text-secondary)]">
-              Formulir untuk ketiga template layanan sedang disiapkan. Halaman yang sudah
-              dibuat akan muncul di sini, dikelompokkan per kategori.
+              Buat halaman pertama dengan tombol di atas, lalu pilih templatenya.
             </p>
           </div>
         ) : (
@@ -85,9 +92,10 @@ const Layanan = () => {
                 </h2>
                 <div className="grid gap-3">
                   {list.map((s) => (
-                    <div
+                    <Link
                       key={s.id}
-                      className="flex items-center justify-between rounded-lg border border-[var(--p-border)] px-4 py-3"
+                      to={`/halaman/${s.id}`}
+                      className="flex items-center justify-between rounded-lg border border-[var(--p-border)] px-4 py-3 hover:bg-[var(--p-surface-hover)]"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -105,7 +113,7 @@ const Layanan = () => {
                           /services/{s.category}/{s.slug}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </section>
