@@ -5,6 +5,7 @@ import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/atoms/Button';
+import ActionMenu from '../components/ui/ActionMenu';
 import { apiFetch } from '@/lib/api';
 
 type Registration = {
@@ -26,6 +27,21 @@ type Registration = {
   created_at: string;
 };
 
+type Schedule = {
+  starts_at: string | null;
+  ends_at: string | null;
+  city: string;
+  format: string;
+  price: string;
+};
+
+type Service = {
+  slug: string;
+  title: string;
+  schedules: Schedule[];
+  plans: Array<{ price: string }>;
+};
+
 type Stage = 'permintaan' | 'peserta';
 
 type Tone = 'neutral' | 'success' | 'warning' | 'critical' | 'info';
@@ -38,16 +54,16 @@ const STATUS_META: Record<string, { label: string; tone: Tone }> = {
 };
 
 const DETAILS: Array<[keyof Registration, string]> = [
-  ['company', 'Instansi'],
+  ['company', 'Instansi/perusahaan'],
   ['company_address', 'Alamat perusahaan'],
-  ['division', 'Divisi'],
+  ['division', 'Divisi/departemen'],
   ['position', 'Jabatan'],
   ['city', 'Kota domisili'],
-  ['certificate_address', 'Kirim sertifikat'],
-  ['referral_source', 'Info dari'],
+  ['certificate_address', 'Alamat kirim sertifikat'],
+  ['referral_source', 'Mendapat info dari'],
 ];
 
-const dateFormat = new Intl.DateTimeFormat('id-ID', {
+const dateTime = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
@@ -56,11 +72,18 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'Asia/Jakarta',
 });
 
+const dateOnly = new Intl.DateTimeFormat('id-ID', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'Asia/Jakarta',
+});
+
 /** Digits only, with the leading zero swapped for the country code. */
-const waLink = (phone: string) => {
+const waNumber = (phone: string) => {
   const digits = phone.replace(/\D/g, '');
   if (!digits) return '';
-  return `https://wa.me/${digits.startsWith('0') ? `62${digits.slice(1)}` : digits}`;
+  return digits.startsWith('0') ? `62${digits.slice(1)}` : digits;
 };
 
 /** The programme slug the registration was submitted against. */
@@ -68,6 +91,10 @@ const programSlug = (path: string): string | null => {
   const match = /[?&]program=([^&]+)/.exec(path);
   return match ? decodeURIComponent(match[1]) : null;
 };
+
+/** Bracketed text is an editor's note in the CMS, never a figure to quote. */
+const usable = (value?: string) =>
+  value && /\d/.test(value) && !value.includes('[') ? value.trim() : '';
 
 const COPY: Record<Stage, { title: string; subtitle: string; empty: string; hint: string }> = {
   permintaan: {
@@ -86,17 +113,15 @@ const COPY: Record<Stage, { title: string; subtitle: string; empty: string; hint
 
 const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
   const [rows, setRows] = React.useState<Registration[]>([]);
-  const [programs, setPrograms] = React.useState<Record<string, string>>({});
+  const [services, setServices] = React.useState<Record<string, Service>>({});
   const [loading, setLoading] = React.useState(true);
-  const [openId, setOpenId] = React.useState<number | null>(null);
+  const [detail, setDetail] = React.useState<Registration | null>(null);
   const [noteDraft, setNoteDraft] = React.useState('');
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/leads?stage=${stage}&limit=200`, {
-        credentials: 'include',
-      });
+      const res = await apiFetch(`/api/leads?stage=${stage}&limit=200`, { credentials: 'include' });
       if (!res.ok) throw new Error('failed');
       const data = await res.json();
       setRows(Array.isArray(data.items) ? data.items : []);
@@ -111,16 +136,15 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
     void load();
   }, [load]);
 
-  // Programme titles, so a row reads "Sertifikasi Trainer" rather than a slug.
+  // Programme titles, dates and prices: a row reads by name, and the invoice
+  // message can quote the batch without anyone retyping it.
   React.useEffect(() => {
     let cancelled = false;
     apiFetch('/api/services', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : []))
-      .then((list) => {
+      .then((list: Service[]) => {
         if (cancelled || !Array.isArray(list)) return;
-        setPrograms(
-          Object.fromEntries(list.map((s: { slug: string; title: string }) => [s.slug, s.title])),
-        );
+        setServices(Object.fromEntries(list.map((s) => [s.slug, s])));
       })
       .catch(() => undefined);
     return () => {
@@ -128,13 +152,7 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
     };
   }, []);
 
-  const open = (row: Registration) => {
-    const next = openId === row.id ? null : row.id;
-    setOpenId(next);
-    setNoteDraft(next === null ? '' : (row.note ?? ''));
-  };
-
-  const patch = async (row: Registration, body: Record<string, unknown>) => {
+  const patch = async (row: Registration, body: Record<string, unknown>, message = 'Tersimpan') => {
     const res = await apiFetch(`/api/leads/${row.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -143,13 +161,118 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
     });
     if (!res.ok) {
       toast.error('Gagal menyimpan perubahan');
-      return;
+      return false;
     }
-    toast.success('Tersimpan');
+    toast.success(message);
+    setDetail(null);
     void load();
+    return true;
+  };
+
+  const serviceOf = (row: Registration) => {
+    const slug = programSlug(row.source_path);
+    return slug ? (services[slug] ?? null) : null;
+  };
+
+  const programName = (row: Registration) =>
+    serviceOf(row)?.title ?? programSlug(row.source_path) ?? '—';
+
+  /**
+   * The invoice message, built from the batch the person registered for. It is
+   * a prefilled WhatsApp draft, not a generated document: nothing here creates
+   * an invoice number or records an amount received.
+   */
+  const invoiceText = (row: Registration) => {
+    const service = serviceOf(row);
+    const schedule = service?.schedules?.find((s) => s.starts_at) ?? null;
+    const price = usable(schedule?.price) || usable(service?.plans?.[0]?.price);
+
+    // Only the facts we actually hold: a missing date or price leaves out its
+    // line rather than printing a blank one.
+    const facts = [
+      schedule?.starts_at
+        ? `Jadwal: ${dateOnly.format(new Date(schedule.starts_at))}${schedule.city ? ` (${schedule.city})` : ''}`
+        : '',
+      price ? `Investasi: ${price}` : '',
+      row.company ? `Atas nama: ${row.company}` : '',
+    ].filter(Boolean);
+
+    return [
+      `Halo ${row.name}, terima kasih sudah mendaftar program ${programName(row)} di Excellence Plus Indonesia.`,
+      ...(facts.length ? ['', ...facts] : []),
+      '',
+      'Berikut kami kirimkan invoice untuk pembayarannya. Kursi kami konfirmasi setelah pembayaran diterima.',
+    ].join('\n');
+  };
+
+  const sendInvoice = async (row: Registration, via: 'wa' | 'email') => {
+    const body = invoiceText(row);
+    const number = waNumber(row.phone);
+
+    if (via === 'wa' && number) {
+      window.open(`https://wa.me/${number}?text=${encodeURIComponent(body)}`, '_blank', 'noopener');
+    } else {
+      const subject = `Invoice pendaftaran ${programName(row)} — Excellence Plus Indonesia`;
+      window.location.href = `mailto:${row.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+
+    // Recorded so the next person to open this row knows it was already sent.
+    const stamp = `Invoice dikirim ${dateTime.format(new Date())} via ${via === 'wa' ? 'WhatsApp' : 'email'}.`;
+    await patch(
+      row,
+      { status: 'contacted', note: row.note ? `${row.note}\n${stamp}` : stamp },
+      'Draft invoice dibuka, status jadi Diproses',
+    );
+  };
+
+  const actionsFor = (row: Registration) =>
+    stage === 'permintaan'
+      ? [
+          { label: 'Lihat detail', icon: 'fa-eye', onSelect: () => openDetail(row) },
+          {
+            label: 'Proses jadi peserta',
+            icon: 'fa-user-check',
+            onSelect: () => void patch(row, { status: 'enrolled' }, 'Dipindahkan ke Peserta'),
+          },
+          {
+            label: 'Kirim invoice via WhatsApp',
+            icon: 'fa-comments',
+            onSelect: () => void sendInvoice(row, 'wa'),
+          },
+          {
+            label: 'Kirim invoice via email',
+            icon: 'fa-envelope',
+            onSelect: () => void sendInvoice(row, 'email'),
+          },
+          {
+            label: 'Tandai batal',
+            icon: 'fa-xmark',
+            danger: true,
+            onSelect: () => void patch(row, { status: 'lost' }, 'Ditandai batal'),
+          },
+        ]
+      : [
+          { label: 'Lihat detail', icon: 'fa-eye', onSelect: () => openDetail(row) },
+          {
+            label: 'Kirim pesan WhatsApp',
+            icon: 'fa-comments',
+            href: waNumber(row.phone) ? `https://wa.me/${waNumber(row.phone)}` : undefined,
+          },
+          {
+            label: 'Kembalikan ke permintaan',
+            icon: 'fa-rotate-left',
+            onSelect: () => void patch(row, { status: 'contacted' }, 'Dikembalikan ke Permintaan'),
+          },
+        ];
+
+  const openDetail = (row: Registration) => {
+    setDetail(row);
+    setNoteDraft(row.note ?? '');
   };
 
   const copy = COPY[stage];
+  const th = 'px-4 py-2.5 text-left text-[0.75rem] font-semibold text-[var(--p-text-secondary)]';
+  const td = 'px-4 py-3 align-top text-[0.8125rem]';
 
   return (
     <GlobalLayout wide>
@@ -183,174 +306,217 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
             <p className="text-[0.8125rem] text-[var(--p-text-secondary)]">{copy.hint}</p>
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--p-border)]">
-            {rows.map((row) => {
-              const meta = STATUS_META[row.status] ?? { label: row.status, tone: 'neutral' as Tone };
-              const expanded = openId === row.id;
-              const wa = waLink(row.phone);
-              const slug = programSlug(row.source_path);
-
-              return (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => open(row)}
-                    aria-expanded={expanded}
-                    className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-[var(--p-surface-hover)]"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-[var(--p-text)]">{row.name}</span>
-                        <Badge tone={meta.tone} dot={row.status === 'new'}>
-                          {meta.label}
-                        </Badge>
-                        {slug && (
-                          <span className="text-xs text-[var(--p-text-secondary)]">
-                            {programs[slug] ?? slug}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 truncate text-[0.8125rem] text-[var(--p-text-secondary)]">
-                        {[row.position, row.company, row.city].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs text-[var(--p-text-secondary)]">
-                      {dateFormat.format(new Date(row.created_at))}
-                    </span>
-                  </button>
-
-                  {expanded && (
-                    <div className="border-t border-[var(--p-border)] bg-[#fafafa] px-4 py-4">
-                      <div className="grid gap-4 lg:grid-cols-3">
-                        <dl className="space-y-1.5 text-[0.8125rem]">
-                          <div className="flex gap-2">
-                            <dt className="w-28 shrink-0 text-[var(--p-text-secondary)]">Email</dt>
-                            <dd className="min-w-0 break-all">
-                              <a
-                                className="text-[var(--p-link)] hover:underline"
-                                href={`mailto:${row.email}`}
-                              >
-                                {row.email}
-                              </a>
-                            </dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="w-28 shrink-0 text-[var(--p-text-secondary)]">
-                              Telepon
-                            </dt>
-                            <dd className="min-w-0">
-                              {wa ? (
-                                <a
-                                  className="text-[var(--p-link)] hover:underline"
-                                  href={wa}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {row.phone}
-                                </a>
-                              ) : (
-                                row.phone
-                              )}
-                            </dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="w-28 shrink-0 text-[var(--p-text-secondary)]">
-                              Program
-                            </dt>
-                            <dd className="min-w-0">{slug ? (programs[slug] ?? slug) : '-'}</dd>
-                          </div>
-                        </dl>
-
-                        <dl className="grid gap-1.5 rounded-lg border border-[var(--p-border)] bg-white p-3 text-[0.8125rem] lg:col-span-2">
-                          {DETAILS.map(([field, label]) => (
-                            <div key={field} className="flex gap-2">
-                              <dt className="w-32 shrink-0 text-[var(--p-text-secondary)]">
-                                {label}
-                              </dt>
-                              <dd className="min-w-0">{String(row[field] || '-')}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </div>
-
-                      {row.message && (
-                        <p className="mt-3 whitespace-pre-wrap rounded-lg border border-[var(--p-border)] bg-white p-3 text-[0.8125rem]">
-                          {row.message}
-                        </p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse">
+              <thead className="border-b border-[var(--p-border)] bg-[#fafafa]">
+                <tr>
+                  <th className={th}>Tanggal</th>
+                  <th className={th}>Nama</th>
+                  <th className={th}>Instansi</th>
+                  <th className={th}>Program</th>
+                  <th className={th}>Kontak</th>
+                  {stage === 'permintaan' && <th className={th}>Status</th>}
+                  <th className={`${th} w-10`}>
+                    <span className="sr-only">Aksi</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const meta = STATUS_META[row.status] ?? {
+                    label: row.status,
+                    tone: 'neutral' as Tone,
+                  };
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b border-[var(--p-border)] last:border-0 hover:bg-[var(--p-surface-hover)]"
+                    >
+                      <td className={`${td} whitespace-nowrap text-[var(--p-text-secondary)]`}>
+                        {dateTime.format(new Date(row.created_at))}
+                      </td>
+                      <td className={td}>
+                        <button
+                          type="button"
+                          onClick={() => openDetail(row)}
+                          className="font-medium text-[var(--p-link)] hover:underline"
+                        >
+                          {row.name}
+                        </button>
+                        <div className="text-[var(--p-text-secondary)]">{row.position || '—'}</div>
+                      </td>
+                      <td className={td}>
+                        {row.company || '—'}
+                        <div className="text-[var(--p-text-secondary)]">{row.city}</div>
+                      </td>
+                      <td className={td}>{programName(row)}</td>
+                      <td className={td}>
+                        <a
+                          className="text-[var(--p-link)] hover:underline"
+                          href={`mailto:${row.email}`}
+                        >
+                          {row.email}
+                        </a>
+                        <div className="text-[var(--p-text-secondary)]">{row.phone}</div>
+                      </td>
+                      {stage === 'permintaan' && (
+                        <td className={td}>
+                          <Badge tone={meta.tone} dot={row.status === 'new'}>
+                            {meta.label}
+                          </Badge>
+                        </td>
                       )}
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        {stage === 'permintaan' ? (
-                          <>
-                            <Button
-                              variant="primary"
-                              onClick={() => void patch(row, { status: 'enrolled' })}
-                            >
-                              Sudah bayar &amp; terjadwal
-                            </Button>
-                            <Button
-                              variant={row.status === 'contacted' ? 'primary' : 'secondary'}
-                              onClick={() => void patch(row, { status: 'contacted' })}
-                            >
-                              Sedang diproses
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() => void patch(row, { status: 'lost' })}
-                            >
-                              Batal
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            onClick={() => void patch(row, { status: 'contacted' })}
-                          >
-                            Kembalikan ke permintaan
-                          </Button>
-                        )}
-                        {wa && (
-                          <a
-                            href={wa}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#cdcdcd] bg-white px-3 py-1.5 text-[0.8125rem] font-medium text-[#303030] hover:bg-[#f7f7f7]"
-                          >
-                            <i className="fa fa-comments" aria-hidden="true" />
-                            Hubungi via WhatsApp
-                          </a>
-                        )}
-                      </div>
-
-                      <div className="mt-4">
-                        <label className="p-label" htmlFor={`note-${row.id}`}>
-                          Catatan internal
-                        </label>
-                        <textarea
-                          id={`note-${row.id}`}
-                          rows={2}
-                          className="p-field"
-                          value={noteDraft}
-                          onChange={(e) => setNoteDraft(e.target.value)}
-                        />
-                        <div className="mt-2">
-                          <Button
-                            variant="secondary"
-                            disabled={noteDraft === (row.note ?? '')}
-                            onClick={() => void patch(row, { note: noteDraft })}
-                          >
-                            Simpan catatan
-                          </Button>
+                      <td className={`${td} text-right`}>
+                        <div className="flex justify-end">
+                          <ActionMenu actions={actionsFor(row)} />
                         </div>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
+
+      {detail && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <button
+            type="button"
+            aria-label="Tutup detail"
+            className="absolute inset-0 bg-black/25"
+            onClick={() => setDetail(null)}
+          />
+          <aside className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-[var(--p-border)] bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--p-border)] px-4 py-3">
+              <div>
+                <h2 className="font-semibold text-[var(--p-text)]">{detail.name}</h2>
+                <p className="text-[0.75rem] text-[var(--p-text-secondary)]">
+                  {programName(detail)} · {dateTime.format(new Date(detail.created_at))}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetail(null)}
+                aria-label="Tutup"
+                className="rounded-lg px-2 py-1 text-[var(--p-text-secondary)] hover:bg-[#f1f1f1]"
+              >
+                <i className="fa fa-xmark" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-4 py-4">
+              <dl className="space-y-1.5 text-[0.8125rem]">
+                <div className="flex gap-2">
+                  <dt className="w-36 shrink-0 text-[var(--p-text-secondary)]">Email</dt>
+                  <dd className="min-w-0 break-all">
+                    <a
+                      className="text-[var(--p-link)] hover:underline"
+                      href={`mailto:${detail.email}`}
+                    >
+                      {detail.email}
+                    </a>
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="w-36 shrink-0 text-[var(--p-text-secondary)]">No. handphone</dt>
+                  <dd className="min-w-0">
+                    {waNumber(detail.phone) ? (
+                      <a
+                        className="text-[var(--p-link)] hover:underline"
+                        href={`https://wa.me/${waNumber(detail.phone)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {detail.phone}
+                      </a>
+                    ) : (
+                      detail.phone
+                    )}
+                  </dd>
+                </div>
+                {DETAILS.map(([field, label]) => (
+                  <div key={field} className="flex gap-2">
+                    <dt className="w-36 shrink-0 text-[var(--p-text-secondary)]">{label}</dt>
+                    <dd className="min-w-0">{String(detail[field] || '—')}</dd>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <dt className="w-36 shrink-0 text-[var(--p-text-secondary)]">Halaman</dt>
+                  <dd className="min-w-0 break-all">{detail.source_path || '—'}</dd>
+                </div>
+              </dl>
+
+              {detail.message && (
+                <div>
+                  <div className="mb-1 text-[0.75rem] text-[var(--p-text-secondary)]">
+                    Catatan pendaftar
+                  </div>
+                  <p className="whitespace-pre-wrap rounded-lg border border-[var(--p-border)] bg-[#fafafa] p-3 text-[0.8125rem]">
+                    {detail.message}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {stage === 'permintaan' ? (
+                  <>
+                    <Button
+                      variant="primary"
+                      onClick={() =>
+                        void patch(detail, { status: 'enrolled' }, 'Dipindahkan ke Peserta')
+                      }
+                    >
+                      Proses jadi peserta
+                    </Button>
+                    <Button variant="secondary" onClick={() => void sendInvoice(detail, 'wa')}>
+                      Kirim invoice
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => void patch(detail, { status: 'lost' }, 'Ditandai batal')}
+                    >
+                      Batal
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      void patch(detail, { status: 'contacted' }, 'Dikembalikan ke Permintaan')
+                    }
+                  >
+                    Kembalikan ke permintaan
+                  </Button>
+                )}
+              </div>
+
+              <div>
+                <label className="p-label" htmlFor={`note-${detail.id}`}>
+                  Catatan internal
+                </label>
+                <textarea
+                  id={`note-${detail.id}`}
+                  rows={3}
+                  className="p-field"
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                />
+                <div className="mt-2">
+                  <Button
+                    variant="secondary"
+                    disabled={noteDraft === (detail.note ?? '')}
+                    onClick={() => void patch(detail, { note: noteDraft }, 'Catatan tersimpan')}
+                  >
+                    Simpan catatan
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
     </GlobalLayout>
   );
 };
