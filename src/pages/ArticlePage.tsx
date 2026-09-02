@@ -6,6 +6,7 @@ import { imageURL } from '@/lib/api';
 import ImageWithFallback from '@/components/atoms/ImageWithFallback';
 import PageHeader from '@/components/ui/PageHeader';
 import Card from '@/components/ui/Card';
+import Button from '@/components/atoms/Button';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-[#cdfee1] text-[#0c5132]',
@@ -34,7 +35,15 @@ const ArticlePage = () => {
 
   return (
     <DashboardLayout wide>
-      <PageHeader title="Artikel" subtitle="Tulisan yang tayang di /blog" />
+      <PageHeader
+        title="Artikel"
+        subtitle="Tulisan yang tayang di /blog"
+        actions={
+          <Button variant="primary" icon="fa-plus" onClick={() => navigate('/artikel/baru')}>
+            Tulis artikel
+          </Button>
+        }
+      />
       <Card>
         {loading && <div className="text-center py-8">Loading...</div>}
         {error && <div className="text-center py-8 text-red-500">{error}</div>}

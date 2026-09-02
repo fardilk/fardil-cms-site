@@ -1,11 +1,9 @@
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Routes, Route } from 'react-router-dom';
 import Login from '../../pages/Login';
 import Dashboard from '../../pages/Dashboard';
 import Category from '../../pages/Category';
 import ArticlePage from '../../pages/ArticlePage';
-import ArticlePageDetail from '../../pages/ArticlePageDetail';
+import ArtikelEditor from '@/pages/ArtikelEditor';
 import ProtectedRoute from '../func/ProtectedRoute';
 import Preview from '@/pages/Preview';
 import Media from '@/pages/Media';
@@ -15,7 +13,7 @@ import LayananEditor from '@/pages/LayananEditor';
 import NotFound from '@/pages/NotFound';
 
 const AppRouter = () => (
-  <DndProvider backend={HTML5Backend}>
+  <>
     <Routes>
       <Route path="/" element={<Login />} />
       <Route
@@ -43,10 +41,18 @@ const AppRouter = () => (
         }
       />
       <Route
+        path="/artikel/baru"
+        element={
+          <ProtectedRoute>
+            <ArtikelEditor />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/artikel/:id"
         element={
           <ProtectedRoute>
-            <ArticlePageDetail />
+            <ArtikelEditor />
           </ProtectedRoute>
         }
       />
@@ -94,7 +100,7 @@ const AppRouter = () => (
           indistinguishable from a crash. */}
       <Route path="*" element={<NotFound />} />
     </Routes>
-  </DndProvider>
+  </>
 );
 
 export default AppRouter;
