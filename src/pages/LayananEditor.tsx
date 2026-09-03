@@ -10,9 +10,12 @@ import Button from '../components/atoms/Button';
 import RepeatableList from '../components/ui/RepeatableList';
 import MediaField from '../components/ui/MediaField';
 import { TextField, TextArea, SelectField, Toggle } from '../components/ui/Field';
+import SectionArranger from '../components/ui/SectionArranger';
 import { apiFetch } from '@/lib/api';
 import { CATEGORIES, TEMPLATES, templateDef, slugify } from '@/lib/serviceTemplates';
 import type { GroupKey } from '@/lib/serviceTemplates';
+import { defaultSections, mergeSections } from '@/lib/pageSections';
+import type { SectionSetting } from '@/lib/pageSections';
 
 type Row = { id?: number; position: number };
 type Highlight = Row & { icon: string; title: string; body: string };
@@ -64,6 +67,13 @@ type Service = {
   secondary_cta_text: string;
   secondary_cta_href: string;
   intro: string;
+  sections: SectionSetting[];
+  audience: string;
+  card_image: string;
+  rating_score: number;
+  rating_count: number;
+  cta_title: string;
+  cta_subtitle: string;
   highlights: Highlight[];
   steps: Step[];
   outcomes: Outcome[];
@@ -96,6 +106,13 @@ const emptyService = (): Service => ({
   secondary_cta_text: '',
   secondary_cta_href: '',
   intro: '',
+  sections: defaultSections('program'),
+  audience: '',
+  card_image: '',
+  rating_score: 0,
+  rating_count: 0,
+  cta_title: '',
+  cta_subtitle: '',
   highlights: [],
   steps: [],
   outcomes: [],
@@ -181,6 +198,7 @@ const LayananEditor = () => {
           })),
           proofs: data.proofs ?? [],
           schedules: data.schedules ?? [],
+          sections: mergeSections(data.sections, data.template),
         };
         setService(loaded);
         baseline.current = JSON.stringify(loaded);
@@ -242,6 +260,15 @@ const LayananEditor = () => {
 
   const set = <K extends keyof Service>(key: K, value: Service[K]) =>
     setService((prev) => ({ ...prev, [key]: value }));
+
+  // A different template offers a different set of bands. Reconcile rather than
+  // reset, so an author who has already reordered or renamed keeps that work.
+  const onTemplateChange = (template: string) =>
+    setService((prev) => ({
+      ...prev,
+      template,
+      sections: mergeSections(prev.sections, template),
+    }));
 
   const onTitleChange = (value: string) => {
     setService((prev) => ({
@@ -605,7 +632,7 @@ const LayananEditor = () => {
                 label="Template"
                 hint={def.audience}
                 value={service.template}
-                onChange={(v) => set('template', v)}
+                onChange={onTemplateChange}
                 options={TEMPLATES.map((t) => ({ value: t.value, label: t.label }))}
               />
               <TextArea
@@ -635,6 +662,25 @@ const LayananEditor = () => {
           {def.groups.map((key) => (
             <React.Fragment key={key}>{groups[key]}</React.Fragment>
           ))}
+
+          <Card title="Ajakan Penutup">
+            <div className="space-y-3">
+              <TextField
+                label="Judul"
+                hint="Kosongkan untuk memakai kalimat bawaan yang menyebut judul layanan."
+                placeholder={`Bicarakan kebutuhan ${service.title || 'layanan'} Anda`}
+                value={service.cta_title}
+                onChange={(v) => set('cta_title', v)}
+              />
+              <TextArea
+                label="Keterangan"
+                rows={2}
+                placeholder="Konsultasi awal tanpa biaya. Kami balas dalam 1x24 jam kerja."
+                value={service.cta_subtitle}
+                onChange={(v) => set('cta_subtitle', v)}
+              />
+            </div>
+          </Card>
         </div>
 
         <div className="space-y-4">
@@ -653,6 +699,59 @@ const LayananEditor = () => {
                 value={String(service.sort_order)}
                 onChange={(v) => set('sort_order', Number(v) || 0)}
               />
+            </div>
+          </Card>
+
+          <SectionArranger
+            value={service.sections}
+            onChange={(v) => set('sections', v)}
+            filled={{
+              highlights: service.highlights.length > 0,
+              steps: service.steps.length > 0,
+              outcomes: service.outcomes.length > 0,
+              metrics: service.metrics.length > 0,
+              faqs: service.faqs.length > 0,
+              plans: service.plans.length > 0,
+              proofs: service.proofs.length > 0,
+              schedules: service.schedules.length > 0,
+            }}
+          />
+
+          <Card title="Kartu di Katalog">
+            <div className="space-y-3">
+              <TextArea
+                label="Cocok untuk"
+                rows={2}
+                hint='Satu kalimat "siapa yang cocok". Tampil di kartu beranda dan di pilihan program pada form reservasi.'
+                placeholder="Supervisor, manajer baru, dan calon pemimpin tim."
+                value={service.audience}
+                onChange={(v) => set('audience', v)}
+              />
+              <MediaField
+                label="Gambar kartu"
+                hint="Kosongkan untuk memakai gambar hero. Tanpa keduanya, kartu memakai gambar buatan."
+                value={service.card_image}
+                onChange={(v) => set('card_image', v)}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField
+                  label="Rating"
+                  type="number"
+                  hint="0 sampai 5. Isi 0 kalau belum ada."
+                  value={String(service.rating_score)}
+                  onChange={(v) => set('rating_score', Number(v) || 0)}
+                />
+                <TextField
+                  label="Jumlah penilai"
+                  type="number"
+                  value={String(service.rating_count)}
+                  onChange={(v) => set('rating_count', Number(v) || 0)}
+                />
+              </div>
+              <p className="text-xs text-[var(--p-text-secondary)]">
+                Rating hanya tampil kalau keduanya diisi. Angka ini klaim tentang peserta nyata,
+                jadi isi hanya dari penilaian yang benar-benar masuk.
+              </p>
             </div>
           </Card>
 
