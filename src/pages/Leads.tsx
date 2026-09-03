@@ -22,6 +22,13 @@ type Lead = {
   city: string;
   certificate_address: string;
   referral_source: string;
+  program_category: string;
+  program_slug: string;
+  participants: string;
+  delivery_mode: string;
+  preferred_batch: string;
+  budget_range: string;
+  preferred_contact: string;
   status: string;
   note: string;
   created_at: string;
@@ -49,6 +56,36 @@ const REGISTRATION_FIELDS: Array<[keyof Lead, string]> = [
   ['referral_source', 'Info dari'],
 ];
 
+/** What /book-consultation asks beyond the contact details. */
+const CONSULTATION_FIELDS: Array<[keyof Lead, string]> = [
+  ['position', 'Jabatan'],
+  ['program_category', 'Bidang'],
+  ['program_slug', 'Program diminati'],
+  ['participants', 'Perkiraan peserta'],
+  ['delivery_mode', 'Format'],
+  ['preferred_batch', 'Target waktu'],
+  ['budget_range', 'Kisaran anggaran'],
+  ['preferred_contact', 'Dihubungi via'],
+  ['referral_source', 'Info dari'],
+];
+
+type Kind = 'enquiry' | 'consultation';
+
+const COPY: Record<Kind, { title: string; subtitle: (n: number) => string; empty: string; hint: string }> = {
+  enquiry: {
+    title: 'Pesan Masuk',
+    subtitle: (n) => `${n} pesan dari formulir kontak di situs. Pendaftaran program ada di Transaksi.`,
+    empty: 'Belum ada pesan',
+    hint: 'Pesan dari formulir kontak di situs akan muncul di sini.',
+  },
+  consultation: {
+    title: 'Permintaan Konsultasi',
+    subtitle: (n) => `${n} permintaan dari /book-consultation. Berisi kebutuhan yang perlu dijawab dengan rekomendasi program.`,
+    empty: 'Belum ada permintaan konsultasi',
+    hint: 'Permintaan dari halaman Book Consultation akan muncul di sini.',
+  },
+};
+
 const dateFormat = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric',
   month: 'short',
@@ -65,7 +102,8 @@ const waLink = (phone: string) => {
   return `https://wa.me/${digits.startsWith('0') ? `62${digits.slice(1)}` : digits}`;
 };
 
-const Leads = () => {
+const Leads: React.FC<{ kind?: Kind }> = ({ kind = 'enquiry' }) => {
+  const copy = COPY[kind];
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [newCount, setNewCount] = React.useState(0);
   const [total, setTotal] = React.useState(0);
@@ -77,8 +115,8 @@ const Leads = () => {
   const load = React.useCallback(async (status: string) => {
     setLoading(true);
     try {
-      // Registrations live under Transaksi; this list is enquiries only.
-      const query = `?kind=enquiry${status ? `&status=${encodeURIComponent(status)}` : ''}`;
+      // Registrations live under Transaksi; this list is one kind at a time.
+      const query = `?kind=${kind}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
       const res = await apiFetch(`/api/leads${query}`, { credentials: 'include' });
       if (!res.ok) throw new Error('failed');
       const data = await res.json();
@@ -90,7 +128,7 @@ const Leads = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [kind]);
 
   React.useEffect(() => {
     void load(filter);
@@ -120,9 +158,9 @@ const Leads = () => {
   return (
     <GlobalLayout wide>
       <PageHeader
-        title="Pesan Masuk"
+        title={copy.title}
         badges={newCount > 0 ? <Badge tone="info" dot>{newCount} baru</Badge> : undefined}
-        subtitle={`${total} pesan dari formulir kontak di situs. Pendaftaran program ada di Transaksi.`}
+        subtitle={copy.subtitle(total)}
         actions={
           <Button icon="fa-rotate" onClick={() => void load(filter)}>
             Muat ulang
@@ -156,10 +194,8 @@ const Leads = () => {
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <i className="fa fa-inbox mb-4 text-4xl text-[var(--p-text-disabled)]" aria-hidden="true" />
-            <p className="font-medium text-[var(--p-text)]">Belum ada pesan</p>
-            <p className="text-[0.8125rem] text-[var(--p-text-secondary)]">
-              Pesan dari formulir kontak di situs akan muncul di sini.
-            </p>
+            <p className="font-medium text-[var(--p-text)]">{copy.empty}</p>
+            <p className="text-[0.8125rem] text-[var(--p-text-secondary)]">{copy.hint}</p>
           </div>
         ) : (
           <ul className="divide-y divide-[var(--p-border)]">
@@ -184,6 +220,9 @@ const Leads = () => {
                         </Badge>
                         {lead.kind === 'registration' && (
                           <Badge tone="success">Pendaftaran</Badge>
+                        )}
+                        {lead.kind === 'consultation' && lead.program_category && (
+                          <Badge tone="neutral">{lead.program_category}</Badge>
                         )}
                         {lead.company && (
                           <span className="text-xs text-[var(--p-text-secondary)]">{lead.company}</span>
@@ -237,9 +276,12 @@ const Leads = () => {
                         </dl>
 
                         <div className="space-y-3 lg:col-span-2">
-                          {lead.kind === 'registration' && (
+                          {(lead.kind === 'registration' || lead.kind === 'consultation') && (
                             <dl className="grid gap-1.5 rounded-lg border border-[var(--p-border)] bg-white p-3 text-[0.8125rem] sm:grid-cols-2">
-                              {REGISTRATION_FIELDS.map(([field, label]) => (
+                              {(lead.kind === 'consultation'
+                                ? CONSULTATION_FIELDS
+                                : REGISTRATION_FIELDS
+                              ).map(([field, label]) => (
                                 <div key={field} className="flex gap-2">
                                   <dt className="w-32 shrink-0 text-[var(--p-text-secondary)]">
                                     {label}

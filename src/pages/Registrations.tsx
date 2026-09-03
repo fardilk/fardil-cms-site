@@ -20,6 +20,13 @@ type Registration = {
   city: string;
   certificate_address: string;
   referral_source: string;
+  program_category: string;
+  program_slug: string;
+  participants: string;
+  delivery_mode: string;
+  preferred_batch: string;
+  preferred_contact: string;
+  kind: string;
   message: string;
   source_path: string;
   status: string;
@@ -55,6 +62,10 @@ const STATUS_META: Record<string, { label: string; tone: Tone }> = {
 
 const DETAILS: Array<[keyof Registration, string]> = [
   ['company', 'Instansi/perusahaan'],
+  ['participants', 'Jumlah peserta'],
+  ['delivery_mode', 'Format pelaksanaan'],
+  ['preferred_batch', 'Batch diminta'],
+  ['preferred_contact', 'Dihubungi via'],
   ['company_address', 'Alamat perusahaan'],
   ['division', 'Divisi/departemen'],
   ['position', 'Jabatan'],
@@ -86,9 +97,14 @@ const waNumber = (phone: string) => {
   return digits.startsWith('0') ? `62${digits.slice(1)}` : digits;
 };
 
-/** The programme slug the registration was submitted against. */
-const programSlug = (path: string): string | null => {
-  const match = /[?&]program=([^&]+)/.exec(path);
+/**
+ * The programme the row was submitted against. Reservations carry it as a
+ * column; rows from the older registration form only ever had it in the link
+ * they arrived from, so that is still read as a fallback.
+ */
+const programSlug = (row: Registration): string | null => {
+  if (row.program_slug) return row.program_slug;
+  const match = /[?&]program=([^&]+)/.exec(row.source_path ?? '');
   return match ? decodeURIComponent(match[1]) : null;
 };
 
@@ -170,12 +186,12 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
   };
 
   const serviceOf = (row: Registration) => {
-    const slug = programSlug(row.source_path);
+    const slug = programSlug(row);
     return slug ? (services[slug] ?? null) : null;
   };
 
   const programName = (row: Registration) =>
-    serviceOf(row)?.title ?? programSlug(row.source_path) ?? '—';
+    serviceOf(row)?.title ?? programSlug(row) ?? '—';
 
   /**
    * The invoice message, built from the batch the person registered for. It is
@@ -190,9 +206,14 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
     // Only the facts we actually hold: a missing date or price leaves out its
     // line rather than printing a blank one.
     const facts = [
-      schedule?.starts_at
-        ? `Jadwal: ${dateOnly.format(new Date(schedule.starts_at))}${schedule.city ? ` (${schedule.city})` : ''}`
-        : '',
+      // What they picked on the form wins over the next open batch: it is the
+      // date they are expecting to be invoiced for.
+      row.preferred_batch
+        ? `Jadwal: ${row.preferred_batch}`
+        : schedule?.starts_at
+          ? `Jadwal: ${dateOnly.format(new Date(schedule.starts_at))}${schedule.city ? ` (${schedule.city})` : ''}`
+          : '',
+      row.participants ? `Jumlah peserta: ${row.participants}` : '',
       price ? `Investasi: ${price}` : '',
       row.company ? `Atas nama: ${row.company}` : '',
     ].filter(Boolean);
@@ -349,7 +370,14 @@ const Registrations: React.FC<{ stage: Stage }> = ({ stage }) => {
                         {row.company || '—'}
                         <div className="text-[var(--p-text-secondary)]">{row.city}</div>
                       </td>
-                      <td className={td}>{programName(row)}</td>
+                      <td className={td}>
+                        {programName(row)}
+                        {row.kind === 'reservation' && (
+                          <div className="text-[var(--p-text-secondary)]">
+                            Reservasi · data sertifikat belum diisi
+                          </div>
+                        )}
+                      </td>
                       <td className={td}>
                         <a
                           className="text-[var(--p-link)] hover:underline"

@@ -98,6 +98,14 @@ const AppRouter = () => (
         }
       />
       <Route
+        path="/konsultasi"
+        element={
+          <ProtectedRoute>
+            <Leads kind="consultation" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/transaksi/permintaan"
         element={
           <ProtectedRoute>

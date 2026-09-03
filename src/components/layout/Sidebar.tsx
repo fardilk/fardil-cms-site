@@ -8,6 +8,7 @@ type NavItem = { label: string; icon: string; path: string; count?: number };
 const generalItems: NavItem[] = [
   { label: 'Dashboard', icon: 'fa-house', path: '/dashboard' },
   { label: 'Pesan Masuk', icon: 'fa-inbox', path: '/pesan' },
+  { label: 'Konsultasi', icon: 'fa-comments', path: '/konsultasi' },
   { label: 'Layanan', icon: 'fa-layer-group', path: '/halaman' },
   { label: 'Artikel', icon: 'fa-newspaper', path: '/artikel' },
   { label: 'Media', icon: 'fa-images', path: '/media' },
@@ -36,6 +37,9 @@ const Sidebar = () => {
   // Registrations waiting on payment, counted the same way.
   const [pending, setPending] = React.useState<number | undefined>(undefined);
 
+  // Consultation requests nobody has answered yet.
+  const [newConsults, setNewConsults] = React.useState<number | undefined>(undefined);
+
   React.useEffect(() => {
     let cancelled = false;
 
@@ -44,6 +48,15 @@ const Sidebar = () => {
       .then((data) => {
         if (!cancelled && data && typeof data.new_count === 'number') {
           setNewLeads(data.new_count || undefined);
+        }
+      })
+      .catch(() => undefined);
+
+    apiFetch('/api/leads?kind=consultation&limit=1', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.new_count === 'number') {
+          setNewConsults(data.new_count || undefined);
         }
       })
       .catch(() => undefined);
@@ -90,8 +103,12 @@ const Sidebar = () => {
     );
   };
 
+  const counts: Record<string, number | undefined> = {
+    '/pesan': newLeads,
+    '/konsultasi': newConsults,
+  };
   const items = generalItems.map((item) =>
-    item.path === '/pesan' ? { ...item, count: newLeads } : item,
+    item.path in counts ? { ...item, count: counts[item.path] } : item,
   );
 
   return (
