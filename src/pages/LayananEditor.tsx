@@ -19,6 +19,15 @@ import type { SectionSetting } from '@/lib/pageSections';
 
 type Row = { id?: number; position: number };
 type Highlight = Row & { icon: string; title: string; body: string };
+type Reason = Row & {
+  icon: string;
+  stat: string;
+  title: string;
+  body: string;
+  source: string;
+  link_href: string;
+  link_text: string;
+};
 type Step = Row & { title: string; body: string; meta: string };
 type Outcome = Row & { icon: string; text: string };
 type Metric = Row & { label: string; value: string };
@@ -75,6 +84,7 @@ type Service = {
   cta_title: string;
   cta_subtitle: string;
   highlights: Highlight[];
+  reasons: Reason[];
   steps: Step[];
   outcomes: Outcome[];
   metrics: Metric[];
@@ -114,6 +124,7 @@ const emptyService = (): Service => ({
   cta_title: '',
   cta_subtitle: '',
   highlights: [],
+  reasons: [],
   steps: [],
   outcomes: [],
   metrics: [],
@@ -139,6 +150,7 @@ const withPositions = <T extends Row>(rows: T[]): T[] =>
 const buildPayload = (s: Service): Service => ({
   ...s,
   highlights: withPositions(s.highlights),
+  reasons: withPositions(s.reasons),
   steps: withPositions(s.steps),
   outcomes: withPositions(s.outcomes),
   metrics: withPositions(s.metrics),
@@ -188,6 +200,7 @@ const LayananEditor = () => {
           ...emptyService(),
           ...data,
           highlights: data.highlights ?? [],
+          reasons: data.reasons ?? [],
           steps: data.steps ?? [],
           outcomes: data.outcomes ?? [],
           metrics: data.metrics ?? [],
@@ -344,6 +357,79 @@ const LayananEditor = () => {
             <TextField
               label="Ikon"
               hint="Nama ikon Font Awesome, contoh: fa-user-tie"
+              value={item.icon}
+              onChange={(v) => update({ icon: v })}
+            />
+          </>
+        )}
+      </RepeatableList>
+    ),
+    reasons: (
+      <RepeatableList<Reason>
+        {...copy('reasons')}
+        items={service.reasons}
+        onChange={(v) => set('reasons', v)}
+        blank={() => ({
+          position: 0,
+          icon: '',
+          stat: '',
+          title: '',
+          body: '',
+          source: '',
+          link_href: '',
+          link_text: '',
+        })}
+        summary={(i) => [i.stat, i.title].filter(Boolean).join(' — ')}
+      >
+        {(item, update) => (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField
+                label="Angka"
+                placeholder="47%"
+                hint="Bagian yang dicetak besar."
+                value={item.stat}
+                onChange={(v) => update({ stat: v })}
+              />
+              <TextField
+                label="Judul"
+                placeholder="Naik jenjang karier"
+                value={item.title}
+                onChange={(v) => update({ title: v })}
+              />
+            </div>
+            <TextArea
+              label="Penjelasan"
+              rows={2}
+              placeholder="Melaporkan kenaikan jenjang dalam 24 bulan setelah tersertifikasi."
+              value={item.body}
+              onChange={(v) => update({ body: v })}
+            />
+            <TextField
+              label="Sumber angka"
+              placeholder="Dari 3.340 responden"
+              hint="Tanpa ini, angkanya cuma klaim."
+              value={item.source}
+              onChange={(v) => update({ source: v })}
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField
+                label="Tautan"
+                placeholder="/blog/slug-artikel"
+                hint="Artikel di situs ini, atau alamat sumber aslinya. Kosong = tanpa tombol."
+                value={item.link_href}
+                onChange={(v) => update({ link_href: v })}
+              />
+              <TextField
+                label="Teks tombol"
+                placeholder="Baca selengkapnya"
+                value={item.link_text}
+                onChange={(v) => update({ link_text: v })}
+              />
+            </div>
+            <TextField
+              label="Ikon"
+              hint="Nama ikon Font Awesome, contoh: fa-chart-line"
               value={item.icon}
               onChange={(v) => update({ icon: v })}
             />
@@ -707,6 +793,7 @@ const LayananEditor = () => {
             onChange={(v) => set('sections', v)}
             filled={{
               highlights: service.highlights.length > 0,
+              reasons: service.reasons.length > 0,
               steps: service.steps.length > 0,
               outcomes: service.outcomes.length > 0,
               metrics: service.metrics.length > 0,

@@ -13,6 +13,7 @@ export type SectionKey =
   | 'intro'
   | 'metrics'
   | 'highlights'
+  | 'reasons'
   | 'outcomes'
   | 'steps'
   | 'schedules'
@@ -47,6 +48,7 @@ export const SECTION_META: Record<SectionKey, { label: string; help: string }> =
   },
   metrics: { label: 'Angka Kunci', help: 'Kartu angka pendek.' },
   highlights: { label: 'Untuk Siapa / Cakupan', help: 'Kartu bergambar ikon.' },
+  reasons: { label: 'Alasan Mengambil Ini', help: 'Empat blok angka, dua per baris, tiap blok bisa ditautkan.' },
   outcomes: { label: 'Hasil / Deliverable', help: 'Daftar poin bercentang.' },
   steps: { label: 'Silabus / Tahapan', help: 'Daftar bernomor urut.' },
   schedules: { label: 'Jadwal Batch', help: 'Kartu jadwal dengan tombol reservasi.' },

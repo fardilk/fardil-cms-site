@@ -9,6 +9,7 @@
 
 export type GroupKey =
   | 'highlights'
+  | 'reasons'
   | 'steps'
   | 'outcomes'
   | 'metrics'
@@ -36,6 +37,11 @@ export type TemplateDef = {
 };
 
 const shared: Partial<Record<GroupKey, GroupCopy>> = {
+  reasons: {
+    title: 'Alasan Mengambil Ini',
+    help: 'Satu angka per blok, bukan kata sifat. "47% naik jenjang dalam 24 bulan" mengalahkan "meningkatkan karier". Sertakan sumbernya, dan tautan ke tulisan yang bisa dibaca — angka yang tidak bisa ditelusuri hanya terdengar seperti klaim.',
+    addLabel: 'Tambah alasan',
+  },
   metrics: {
     title: 'Angka Kunci',
     help: 'Angka pendek yang membangun kepercayaan. Kosongkan jika belum ada data nyata.',
@@ -58,7 +64,7 @@ export const TEMPLATES: TemplateDef[] = [
     value: 'program',
     label: 'Program',
     audience: 'Training dan Coaching — pembelajaran terjadwal, ada harga, bisa didaftar.',
-    groups: ['highlights', 'outcomes', 'steps', 'schedules', 'plans', 'proofs', 'metrics', 'faqs'],
+    groups: ['highlights', 'reasons', 'outcomes', 'steps', 'schedules', 'plans', 'proofs', 'metrics', 'faqs'],
     copy: {
       ...shared,
       highlights: {
@@ -94,7 +100,7 @@ export const TEMPLATES: TemplateDef[] = [
     value: 'engagement',
     label: 'Engagement',
     audience: 'Consultancy — proyek dengan scope, ditawarkan bukan diberi harga tetap.',
-    groups: ['highlights', 'steps', 'outcomes', 'schedules', 'plans', 'proofs', 'metrics', 'faqs'],
+    groups: ['highlights', 'reasons', 'steps', 'outcomes', 'schedules', 'plans', 'proofs', 'metrics', 'faqs'],
     copy: {
       ...shared,
       highlights: {
@@ -130,7 +136,7 @@ export const TEMPLATES: TemplateDef[] = [
     value: 'retainer',
     label: 'Layanan Berkelanjutan',
     audience: 'Executive Search dan EOR — jasa berjalan dengan SLA dan konsekuensi hukum.',
-    groups: ['highlights', 'steps', 'outcomes', 'plans', 'proofs', 'metrics', 'faqs'],
+    groups: ['highlights', 'reasons', 'steps', 'outcomes', 'plans', 'proofs', 'metrics', 'faqs'],
     copy: {
       ...shared,
       highlights: {
